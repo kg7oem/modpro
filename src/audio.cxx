@@ -33,6 +33,12 @@ audio::sample_type * audio::make_buffer(const audio::size_type size_in)
     return static_cast<audio::sample_type *>(new_buffer);
 }
 
+audio::processor::processor(std::shared_ptr<event::broker> broker_in)
+: broker(broker_in)
+{
+
+}
+
 void audio::processor::init()
 {
     assert(! initialized);
@@ -53,6 +59,10 @@ void audio::processor::init_jack()
     input = jack->add_audio_input("in_1");
     output = jack->add_audio_output("out_1");
 
+    set_auto_connect("IC-7100 In:capture_1", "ModPro:in_1");
+    set_auto_connect("ModPro:out_1", "system:playback_1");
+    set_auto_connect("ModPro:out_1", "system:playback_2");
+
     std::cout << "Jack is initialized" << std::endl;
     std::cout << "  sample rate = " << jack->get_sample_rate() << std::endl;
     std::cout << "  max buffer size = " << jack->get_buffer_size() << std::endl;
@@ -63,7 +73,6 @@ void audio::processor::init_dsp()
 {
     ladspa = modpro::ladspa::make();
     ladspa->open("/usr/lib/ladspa/amp_1181.so");
-    ladspa->open("/usr/lib/ladspa/ZamComp-ladspa.so");
     ladspa->open("/usr/lib/ladspa/ZamGate-ladspa.so");
     ladspa->open("/usr/lib/ladspa/delay_1898.so");
 
@@ -109,23 +118,38 @@ void audio::processor::start()
         i->activate();
     }
 
-    std::cout << std::endl;
-
-    std::cout << "  Activating JACK" << std::endl;
-    std::cout << std::endl;
-
     activated = true;
-
     jack_lock.unlock();
+
     jack->activate();
+    check_auto_connect();
 
     broker->send_event(event::name::audio_started);
+}
+
+void audio::processor::set_auto_connect(const std::string source_in, const std::string dest_in)
+{
+    auto_connect[source_in].push_back(dest_in);
 }
 
 // inside jack audio thread - jack is already locked
 void audio::processor::handle_shutdown()
 {
     broker->send_event(event::name::audio_stopped);
+}
+
+void audio::processor::check_auto_connect()
+{
+    // FIXME this doesn't really seem good enough
+    for(auto i : auto_connect) {
+        for (auto j : i.second ) {
+            std::cout << "Auto connect: " << i.first << " -> " << j << std::endl;
+            auto result = jack->connect_port(i.first, j);
+            if (result != 0 && result != EEXIST) {
+                std::cout << "Error trying to connect ports: " << i.first << " -> " << j << std::endl;
+            }
+        }
+    }
 }
 
 void audio::processor::handle_client_register(const std::string client_name_in)

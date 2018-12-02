@@ -18,6 +18,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "effect.h"
 #include "jackaudio.h"
@@ -39,6 +40,7 @@ struct audio {
         std::shared_ptr<event::broker> broker;
         bool initialized = false;
         bool activated = false;
+        std::map<const std::string, std::vector<std::string>> auto_connect;
         std::shared_ptr<modpro::jackaudio::client> jack;
         std::shared_ptr<modpro::jackaudio::audio_port> input;
         std::shared_ptr<modpro::jackaudio::audio_port> output;
@@ -51,9 +53,10 @@ struct audio {
 
         void init_jack();
         void init_dsp();
+        void check_auto_connect();
 
         public:
-        processor(std::shared_ptr<event::broker> broker_in) : broker(broker_in) { }
+        processor(std::shared_ptr<event::broker> broker_in);
         virtual ~processor() { }
         template<typename... Args>
         static std::shared_ptr<processor> make(Args... args)
@@ -65,6 +68,7 @@ struct audio {
 
         void init();
         void start();
+        void set_auto_connect(const std::string source_in, const std::string dest_in);
         virtual void handle_client_register(const std::string client_name_in);
         virtual void handle_client_unregister(const std::string client_name_in);
         virtual void handle_shutdown();

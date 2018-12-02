@@ -15,11 +15,20 @@
 
 #include <cassert>
 #include <functional>
+#include <iostream>
+#include <string>
 #include <string.h>
 
 #include "jackaudio.h"
 
 namespace modpro {
+
+jackaudio::client::client(const std::string name_in, std::shared_ptr<handlers> handler_in)
+: handler(handler_in), name(name_in)
+{
+
+}
+
 
 jackaudio::client::~client()
 {
@@ -172,6 +181,29 @@ jackaudio::nframes_type jackaudio::client::get_buffer_size()
     return buffer_size;
 }
 
+std::vector<std::string> jackaudio::client::get_known_client_names()
+{
+    const char ** known_ports = jack_get_ports(client_p, ".", ".", 0);
+    std::vector<std::string> client_names;
+
+    for (int i = 0; known_ports[i] != nullptr; i++) {
+        std::string client_and_port(known_ports[i]);
+        auto colon_pos = client_and_port.find(":");
+
+        std::cout << "Port: " << client_and_port << std::endl;
+
+        if (colon_pos == std::string::npos) {
+            throw std::runtime_error("invalid client/port name from jack");
+        }
+
+        client_names.push_back(client_and_port.substr(0, colon_pos));
+    }
+
+    jack_free(known_ports);
+    return client_names;
+}
+
+
 jackaudio::port_type * jackaudio::client::register_port(const std::string name_in, const char * port_type_in, const unsigned long flags_in, unsigned long buffer_size_in = 0)
 {
     assert(client_p != nullptr);
@@ -195,6 +227,11 @@ std::shared_ptr<jackaudio::audio_port> jackaudio::client::add_audio_output(const
 {
     auto new_port = register_port(name_in, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
     return jackaudio::audio_port::make(this->shared_from_this(), new_port);
+}
+
+int jackaudio::client::connect_port(const std::string source_in, const std::string dest_in)
+{
+    return jack_connect(client_p, source_in.c_str(), dest_in.c_str());
 }
 
 jackaudio::port::~port()

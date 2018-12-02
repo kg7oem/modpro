@@ -32,6 +32,11 @@ void handle_audio_stopped(bool * should_run_p_in)
     cout << "Audio system has stopped" << endl;
 }
 
+void handle_audio_client_changed(shared_ptr<audio::processor> processor_in)
+{
+
+}
+
 void process_audio()
 {
     bool should_run = true;
@@ -46,7 +51,7 @@ void process_audio()
             case event::name::audio_started: handle_audio_started(); break;
             case event::name::audio_stopped: handle_audio_stopped(&should_run); break;
             case event::name::audio_processed: break;
-            case event::name::audio_client_change: break;
+            case event::name::audio_client_change: handle_audio_client_changed(processor); break;
         }
     }
 }
