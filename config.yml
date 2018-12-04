@@ -1,0 +1,43 @@
+---
+
+plugins:
+  - /usr/lib/ladspa/amp_1181.so
+  - /usr/lib/ladspa/ZamGate-ladspa.so
+  - /usr/lib/ladspa/delay_1898.so
+
+routes:
+  - [ Network In:out_1, ModPro:receive_in_1 ]
+  - [ ModPro:receive_out_1, system:playback_1 ]
+  - [ ModPro:receive_out_1, system:playback_2 ]
+
+chains:
+  receive:
+    inputs:
+      - gain.Input
+    outputs:
+      - gate.Audio Output 1
+    effects:
+      - name: gain
+        type: Simple amplifier
+        controls:
+          Amps gain (dB): 0
+        wires:
+          Output:
+            - delay.Input
+            - gate.Sidechain Input
+      - name: delay
+        type: Simple delay line, linear interpolation
+        controls:
+          Delay Time (s): .150
+          Max Delay (s): .2
+        wires:
+          Output:
+            - gate.Audio Input 1
+      - name: gate
+        type: ZamGate
+        controls:
+          Sidechain: 1
+          Threshold: -65
+          Attack: 25
+          Release: 25
+          Max gate close: -.inf

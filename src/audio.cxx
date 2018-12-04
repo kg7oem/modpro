@@ -21,6 +21,54 @@
 #include "audio.h"
 
 namespace modpro {
+
+audio::config::config(const std::string path_in)
+: path(path_in)
+{
+    root = YAML::LoadFile(path);
+}
+
+std::vector<std::string> audio::config::get_plugins()
+{
+    std::vector<std::string> retval;
+
+    if (! root["plugins"]) {
+        throw std::runtime_error("config file had no plugins section");
+    } else if (! root["plugins"].IsSequence()) {
+        throw std::runtime_error("config file plugins was not a list");
+    }
+
+    for(auto i : root["plugins"]) {
+        retval.push_back(i.as<std::string>());
+    }
+
+    return retval;
+}
+
+YAML::Node audio::config::get_chains()
+{
+    if (! root["chains"]) {
+        throw std::runtime_error("config file did not have chains section");
+    }
+
+    auto chains_node = root["chains"];
+
+    if (! chains_node.IsMap()) {
+        throw std::runtime_error("chains node in config file was not a map");
+    }
+
+    return chains_node;
+}
+
+YAML::Node audio::config::get_routes()
+{
+    if (! root["routes"]) {
+        throw std::runtime_error("config file did not have a routes section");
+    }
+
+    return root["routes"];
+}
+
 audio::sample_type * audio::make_buffer(const audio::size_type size_in)
 {
     assert(size_in > 0);
@@ -33,8 +81,8 @@ audio::sample_type * audio::make_buffer(const audio::size_type size_in)
     return static_cast<audio::sample_type *>(new_buffer);
 }
 
-audio::processor::processor(std::shared_ptr<event::broker> broker_in)
-: broker(broker_in)
+audio::processor::processor(const std::string conf_file_path_in, std::shared_ptr<event::broker> broker_in)
+: config(conf_file_path_in), broker(broker_in)
 {
 
 }
@@ -53,15 +101,17 @@ void audio::processor::init()
 // outside jack audio thread
 void audio::processor::init_jack()
 {
+    std::cout << "Initializing JACK audio" << std::endl;
+
     jack = modpro::jackaudio::client::make("ModPro", this->shared_from_this());
     jack->open();
 
-    input = jack->add_audio_input("in_1");
-    output = jack->add_audio_output("out_1");
-
-    set_auto_connect("IC-7100 In:capture_1", "ModPro:in_1");
-    set_auto_connect("ModPro:out_1", "system:playback_1");
-    set_auto_connect("ModPro:out_1", "system:playback_2");
+    for (auto i : config.get_routes()) {
+        auto source = i[0].as<std::string>();
+        auto dest = i[1].as<std::string>();
+        std::cout << "  setting auto connect " << source << " -> " << dest << std::endl;
+        set_auto_connect(source, dest);
+    }
 
     std::cout << "Jack is initialized" << std::endl;
     std::cout << "  sample rate = " << jack->get_sample_rate() << std::endl;
@@ -72,34 +122,76 @@ void audio::processor::init_jack()
 void audio::processor::init_dsp()
 {
     ladspa = modpro::ladspa::make();
-    ladspa->open("/usr/lib/ladspa/amp_1181.so");
-    ladspa->open("/usr/lib/ladspa/ZamGate-ladspa.so");
-    ladspa->open("/usr/lib/ladspa/delay_1898.so");
+    for (auto i : config.get_plugins()) {
+        ladspa->open(i);
+    }
 
-    gain_effect = make_effect("Simple amplifier");
-    gain_effect->set_control("Amps gain (dB)", 0);
+    for (auto i : config.get_chains()) {
+        auto chain_name = i.first.as<std::string>();
+        auto chain_node = i.second;
+        auto inputs_node = chain_node["inputs"];
+        auto outputs_node = chain_node["outputs"];
+        auto effects_node = chain_node["effects"];
+        int port_num;
 
-    delay_effect = make_effect("Simple delay line, linear interpolation");
-    delay_effect->set_control("Delay Time (s)", .150);
-    delay_effect->set_control("Max Delay (s)", .2);
+        std::cout << "Creating new chain: " << chain_name << std::endl;
 
-    gate_effect = make_effect("ZamGate");
-    gate_effect->set_control("Sidechain", 1);
-    gate_effect->set_control("Threshold", -65);
-    gate_effect->set_control("Attack", 25);
-    gate_effect->set_control("Release", 25);
-    gate_effect->set_control("Max gate close", -INFINITY);
+        port_num = 0;
+        for (auto k : chain_node["inputs"]) {
+            port_num++;
+            auto port_name = chain_name + "_in_" + std::to_string(port_num);
+            std::cout << "  creating JACK input port: " << port_name << std::endl;
+            auto new_jack_port = jack->add_audio_input(port_name);
+            jack_connections[k.as<std::string>()] = new_jack_port;
+        }
 
-    sample_type * buf_p;
+        port_num = 0;
+        for (auto k : chain_node["outputs"]) {
+            port_num++;
+            auto port_name = chain_name + "_out_" + std::to_string(port_num);
+            std::cout << "  creating JACK output port: " << port_name << std::endl;
+            auto new_jack_port = jack->add_audio_output(port_name);
+            jack_connections[k.as<std::string>()] = new_jack_port;
+        }
 
-    buf_p = make_buffer();
-    gain_effect->connect("Output", buf_p);
-    delay_effect->connect("Input", buf_p);
-    gate_effect->connect("Sidechain Input", buf_p);
+        for (auto j : effects_node) {
+            auto effect_name = j["name"].as<std::string>();
+            auto effect_type_name = j["type"].as<std::string>();
 
-    buf_p = make_buffer();
-    delay_effect->connect("Output", buf_p);
-    gate_effect->connect("Audio Input 1", buf_p);
+            std::cout << "  creating new effect: " << effect_name << " = " << effect_type_name << std::endl;
+            auto effect = make_effect(effect_type_name);
+
+            for (auto k : j["controls"]) {
+                auto control_name = k.first.as<std::string>();
+                auto control_value = k.second.as<audio::data_type>();
+                std::cout << "    setting control: " << control_name << " = " << control_value << std::endl;
+                effect->set_control(control_name, control_value);
+            }
+
+            chain_effects[effect_name] = effect;
+        }
+
+        for (auto j : effects_node) {
+            auto effect_name = j["name"].as<std::string>();
+            auto src_effect = chain_effects[effect_name];
+
+            for (auto k : j["wires"]) {
+                auto buf = make_buffer();
+                auto src_port_name = k.first.as<std::string>();
+
+                src_effect->connect(src_port_name, buf);
+
+                for (auto l : k.second) {
+                    auto dest = parse_effect_port_string(l.as<std::string>());
+                    std::cout << "  wiring " << effect_name << "." << src_port_name << " to " << dest.first << "." << dest.second << std::endl;
+                    auto dest_effect = chain_effects[dest.first];
+                    dest_effect->connect(dest.second, buf);
+                }
+            }
+        }
+
+        std::cout << std::endl;
+    }
 
     std::cout << "DSP is initialized" << std::endl;
     std::cout << std::endl;
@@ -168,8 +260,11 @@ void audio::processor::handle_process(modpro::jackaudio::nframes_type nframes)
     assert(initialized);
     assert(activated);
 
-    gain_effect->connect("Input", input->get_buffer(nframes));
-    gate_effect->connect("Audio Output 1", output->get_buffer(nframes));
+    for(auto i : jack_connections) {
+        auto effect_port = parse_effect_port_string(i.first);
+        auto effect = chain_effects[effect_port.first];
+        effect->connect(effect_port.second, i.second->get_buffer(nframes));
+    }
 
     for(auto i : effects) {
         i->run(nframes);
@@ -177,8 +272,11 @@ void audio::processor::handle_process(modpro::jackaudio::nframes_type nframes)
 
     // JACK does not gurantee buffers wont change between calls to the
     // process handler
-    gain_effect->disconnect("Input");
-    gate_effect->disconnect("Audio Output 1");
+    for(auto i : jack_connections) {
+        auto effect_port = parse_effect_port_string(i.first);
+        auto effect = chain_effects[effect_port.first];
+        effect->disconnect(effect_port.second);
+    }
 
     broker->send_event(event::name::audio_processed);
 }
@@ -207,6 +305,19 @@ audio::sample_type * audio::processor::make_buffer()
     auto new_buffer = modpro::audio::make_buffer(jack->get_buffer_size());
     buffers.push_back(new_buffer);
     return new_buffer;
+}
+
+std::pair<const std::string, const std::string> audio::processor::parse_effect_port_string(const std::string string_in)
+{
+    auto dot_pos = string_in.find(".");
+
+    if (dot_pos == std::string::npos) {
+        throw std::runtime_error("unable to find string in " + string_in);
+    }
+
+    auto effect_name = string_in.substr(0, dot_pos);
+    auto port_name = string_in.substr(dot_pos + 1, string_in.size());
+    return std::make_pair(effect_name, port_name);
 }
 
 }

@@ -37,11 +37,11 @@ void handle_audio_client_changed(shared_ptr<audio::processor> processor_in)
 
 }
 
-void process_audio()
+void process_audio(const char * conf_path)
 {
     bool should_run = true;
     auto broker = make_shared<event::broker>();
-    auto processor = audio::processor::make(broker);
+    auto processor = audio::processor::make(conf_path, broker);
     processor->start();
 
     while(should_run) {
@@ -56,12 +56,16 @@ void process_audio()
     }
 }
 
-int main(void)
+int main(int argc, const char *argv[])
 {
+    if (argc != 2) {
+        throw std::runtime_error("specify a configuration file");
+    }
+
     cout << "Starting" << endl;
     cout << endl;
 
-    process_audio();
+    process_audio(argv[1]);
 
     cout << "Done" << endl;
     return 0;

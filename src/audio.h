@@ -18,6 +18,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <yaml-cpp/yaml.h>
 #include <vector>
 
 #include "effect.h"
@@ -31,12 +32,26 @@ struct audio {
     using data_type = float;
     using size_type = unsigned long;
 
+    class config {
+        YAML::Node root;
+
+        public:
+        const std::string path;
+        config(const std::string path_in);
+        std::vector<std::string> get_plugins();
+        YAML::Node get_chains();
+        YAML::Node get_routes();
+    };
+
     class processor : public modpro::jackaudio::handlers, public std::enable_shared_from_this<processor> {
+        public:
         using effect_type = std::shared_ptr<modpro::effect>;
         using sample_type = modpro::audio::sample_type;
         using size_type = modpro::audio::size_type;
 
+        private:
         // FIXME do these bools need to be atomic?
+        audio::config config;
         std::shared_ptr<event::broker> broker;
         bool initialized = false;
         bool activated = false;
@@ -47,16 +62,17 @@ struct audio {
         std::shared_ptr<modpro::ladspa> ladspa;
         std::vector<sample_type *> buffers;
         std::vector<effect_type> effects;
-        effect_type gain_effect;
-        effect_type delay_effect;
-        effect_type gate_effect;
+        std::map<std::string, std::shared_ptr<jackaudio::audio_port>> jack_connections;
+        // FIXME this needs to be expanded to support N chains instead of 1
+        std::map<std::string, audio::processor::effect_type> chain_effects;
 
         void init_jack();
         void init_dsp();
         void check_auto_connect();
+        std::pair<const std::string, const std::string> parse_effect_port_string(const std::string string_in);
 
         public:
-        processor(std::shared_ptr<event::broker> broker_in);
+        processor(const std::string conf_path_in, std::shared_ptr<event::broker> broker_in);
         virtual ~processor() { }
         template<typename... Args>
         static std::shared_ptr<processor> make(Args... args)
@@ -80,6 +96,14 @@ struct audio {
     };
 
     static sample_type * make_buffer(const size_type size_in);
+
+    class chain {
+        std::map<std::string, audio::processor::effect_type> effects;
+
+        public:
+        void add_effect(const std::string name_in, audio::processor::effect_type effect_in);
+    };
+
 };
 
 }
