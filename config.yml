@@ -2,11 +2,14 @@
 
 plugins:
   - /usr/lib/ladspa/amp_1181.so
-  - /usr/lib/ladspa/ZamGate-ladspa.so
   - /usr/lib/ladspa/delay_1898.so
+  - /usr/lib/ladspa/ZamGEQ31-ladspa.so
+  - /usr/lib/ladspa/ZamGate-ladspa.so
 
 routes:
-  - [ Network In:out_1, ModPro:receive_in_1 ]
+  - [ system:capture_1, ModPro:transmit_in_1 ]
+  - [ ModPro:transmit_out_1, "IC-7100 Out:playback_1" ]
+  - [ "IC-7100 In:capture_1", ModPro:receive_in_1 ]
   - [ ModPro:receive_out_1, system:playback_1 ]
   - [ ModPro:receive_out_1, system:playback_2 ]
 
@@ -41,3 +44,34 @@ chains:
           Attack: 25
           Release: 25
           Max gate close: -.inf
+  transmit:
+    inputs:
+      - t_geq.Audio Input 1
+    outputs:
+      - t_geq.Audio Output 1
+    effects:
+      - name: t_geq
+        type: ZamGEQ31
+        controls:
+          Master Gain: 0
+          32Hz: -.inf
+          40Hz: -.inf
+          50Hz: -.inf
+          63Hz: -.inf
+          79Hz: -.inf
+          100Hz: 12
+          126Hz: 12
+          158Hz: 8
+          200Hz: 2
+          1584Hz: 1
+          1997Hz: 2
+          2514Hz: 3
+          3165Hz: 5
+          3986Hz: 12
+          5017Hz: -.inf
+          6318Hz: -.inf
+          7963Hz: -.inf
+          10032Hz: -.inf
+          12662Hz: -.inf
+          16081Hz: -.inf
+          20801Hz: -.inf
