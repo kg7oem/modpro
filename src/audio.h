@@ -21,7 +21,7 @@
 #include <yaml-cpp/yaml.h>
 #include <vector>
 
-#include "effect.h"
+#include "chain.h"
 #include "jackaudio.h"
 #include "ladspa.h"
 
@@ -61,10 +61,7 @@ struct audio {
         std::shared_ptr<modpro::jackaudio::audio_port> output;
         std::shared_ptr<modpro::ladspa> ladspa;
         std::vector<sample_type *> buffers;
-        std::vector<effect_type> effects;
-        std::map<std::string, std::shared_ptr<jackaudio::audio_port>> jack_connections;
-        // FIXME this needs to be expanded to support N chains instead of 1
-        std::map<std::string, audio::processor::effect_type> chain_effects;
+        std::map<std::string, std::shared_ptr<modpro::chain>> chains;
 
         void init_jack();
         void init_dsp();

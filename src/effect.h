@@ -22,14 +22,9 @@
 namespace modpro {
 
 struct effect {
-    struct notification;
-
     using sample_type = float;
     using data_type = float;
     using size_type = unsigned long;
-
-    protected:
-    void notify(const std::string port_name_in, const effect::data_type value_in);
 
     public:
     const size_type effect_id;

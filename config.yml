@@ -46,11 +46,11 @@ chains:
           Max gate close: -.inf
   transmit:
     inputs:
-      - t_geq.Audio Input 1
+      - eq.Audio Input 1
     outputs:
-      - t_geq.Audio Output 1
+      - eq.Audio Output 1
     effects:
-      - name: t_geq
+      - name: eq
         type: ZamGEQ31
         controls:
           Master Gain: 0

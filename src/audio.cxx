@@ -17,7 +17,6 @@
 #include <functional>
 #include <stdexcept>
 
-#include "effect.h"
 #include "audio.h"
 
 namespace modpro {
@@ -134,25 +133,13 @@ void audio::processor::init_dsp()
         auto effects_node = chain_node["effects"];
         int port_num;
 
+        if (chains.count(chain_name) != 0) {
+            throw std::runtime_error("attempt to register duplicate chain name: " + chain_name);
+        }
+
         std::cout << "Creating new chain: " << chain_name << std::endl;
-
-        port_num = 0;
-        for (auto k : chain_node["inputs"]) {
-            port_num++;
-            auto port_name = chain_name + "_in_" + std::to_string(port_num);
-            std::cout << "  creating JACK input port: " << port_name << std::endl;
-            auto new_jack_port = jack->add_audio_input(port_name);
-            jack_connections[k.as<std::string>()] = new_jack_port;
-        }
-
-        port_num = 0;
-        for (auto k : chain_node["outputs"]) {
-            port_num++;
-            auto port_name = chain_name + "_out_" + std::to_string(port_num);
-            std::cout << "  creating JACK output port: " << port_name << std::endl;
-            auto new_jack_port = jack->add_audio_output(port_name);
-            jack_connections[k.as<std::string>()] = new_jack_port;
-        }
+        auto new_chain = std::make_shared<modpro::chain>(chain_name);
+        chains[chain_name] = new_chain;
 
         for (auto j : effects_node) {
             auto effect_name = j["name"].as<std::string>();
@@ -168,12 +155,30 @@ void audio::processor::init_dsp()
                 effect->set_control(control_name, control_value);
             }
 
-            chain_effects[effect_name] = effect;
+            new_chain->add_effect(effect_name, effect);
+        }
+
+        port_num = 0;
+        for (auto k : chain_node["inputs"]) {
+            port_num++;
+            auto port_name = chain_name + "_in_" + std::to_string(port_num);
+            std::cout << "  creating JACK input port: " << port_name << std::endl;
+            auto new_jack_port = jack->add_audio_input(port_name);
+            new_chain->add_route(k.as<std::string>(), new_jack_port);
+        }
+
+        port_num = 0;
+        for (auto k : chain_node["outputs"]) {
+            port_num++;
+            auto port_name = chain_name + "_out_" + std::to_string(port_num);
+            std::cout << "  creating JACK output port: " << port_name << std::endl;
+            auto new_jack_port = jack->add_audio_output(port_name);
+            new_chain->add_route(k.as<std::string>(), new_jack_port);
         }
 
         for (auto j : effects_node) {
             auto effect_name = j["name"].as<std::string>();
-            auto src_effect = chain_effects[effect_name];
+            auto src_effect = new_chain->get_effect(effect_name);
 
             for (auto k : j["wires"]) {
                 auto buf = make_buffer();
@@ -184,10 +189,7 @@ void audio::processor::init_dsp()
                 for (auto l : k.second) {
                     auto dest = parse_effect_port_string(l.as<std::string>());
                     std::cout << "  wiring " << effect_name << "." << src_port_name << " to " << dest.first << "." << dest.second << std::endl;
-                    if (chain_effects.count(dest.first) == 0) {
-                        throw std::runtime_error("could not find effect named "  + dest.first);
-                    }
-                    auto dest_effect = chain_effects[dest.first];
+                    auto dest_effect = new_chain->get_effect(dest.first);
                     dest_effect->connect(dest.second, buf);
                 }
             }
@@ -208,9 +210,9 @@ void audio::processor::start()
     assert(initialized);
     assert(! activated);
 
-    for (auto i : effects) {
-        std::cout << "  Activating effect " << i->get_name() << std::endl;
-        i->activate();
+    for (auto i : chains) {
+        std::cout << "  Activating chain " << i.first << std::endl;
+        i.second->activate();
     }
 
     activated = true;
@@ -263,28 +265,23 @@ void audio::processor::handle_process(modpro::jackaudio::nframes_type nframes)
     assert(initialized);
     assert(activated);
 
-    for(auto i : jack_connections) {
-        auto effect_port = parse_effect_port_string(i.first);
-        if (chain_effects.count(effect_port.first) == 0) {
-            throw std::runtime_error("could not find effect named "  + effect_port.first);
+    for(auto chain_entry : chains) {
+        auto chain = chain_entry.second;
+        for(auto i : chain->get_routes()) {
+            auto effect_port = parse_effect_port_string(i.first);
+            auto effect = chain->get_effect(effect_port.first);
+            effect->connect(effect_port.second, i.second->get_buffer(nframes));
         }
-        auto effect = chain_effects[effect_port.first];
-        effect->connect(effect_port.second, i.second->get_buffer(nframes));
-    }
 
-    for(auto i : effects) {
-        i->run(nframes);
-    }
+        chain->run(nframes);
 
-    // JACK does not gurantee buffers wont change between calls to the
-    // process handler
-    for(auto i : jack_connections) {
-        auto effect_port = parse_effect_port_string(i.first);
-        auto effect = chain_effects[effect_port.first];
-        if (chain_effects.count(effect_port.first) == 0) {
-            throw std::runtime_error("could not find effect named "  + effect_port.first);
+        // JACK does not gurantee buffers wont change between calls to the
+        // process handler
+        for(auto i : chain->get_routes()) {
+            auto effect_port = parse_effect_port_string(i.first);
+            auto effect = chain->get_effect(effect_port.first);
+            effect->disconnect(effect_port.second);
         }
-        effect->disconnect(effect_port.second);
     }
 
     broker->send_event(event::name::audio_processed);
@@ -305,7 +302,6 @@ void audio::processor::handle_buffer_size_change(modpro::jackaudio::nframes_type
 audio::processor::effect_type audio::processor::make_effect(const std::string name_in)
 {
     auto new_effect = ladspa->instantiate(name_in, jack->get_sample_rate());
-    effects.push_back(new_effect);
     return new_effect;
 }
 
