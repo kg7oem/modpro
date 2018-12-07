@@ -1,0 +1,10 @@
+[Unit]
+Description=JACK audio server
+Requires=dbus.socket
+
+[Service]
+ExecStart=/usr/bin/jackd -d alsa -d hw:iTwo --period 128 --nperiods 5 --rate 48000
+Restart=always
+
+[Install]
+WantedBy=default.target

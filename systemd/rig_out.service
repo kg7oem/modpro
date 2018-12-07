@@ -1,0 +1,12 @@
+[Unit]
+Description=alsa_in:IC-7100 Out
+Requires=dbus.socket
+After=jackd.service
+
+[Service]
+ExecStart=/usr/bin/alsa_out -j "IC-7100 Out" -d hw:CODEC
+Restart=always
+
+[Install]
+Needs=jackd.service
+WantedBy=default.target

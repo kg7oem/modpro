@@ -1,0 +1,12 @@
+[Unit]
+Description=modpro
+Requires=dbus.socket
+Before=rig_in.service,rig_out.service
+
+[Service]
+ExecStart=/home/modpro/modpro/modpro /home/modpro/modpro.yml
+Restart=always
+
+[Install]
+WantedBy=default.target
+Needs=jackd.service,rig_in.service,rig_out.service
