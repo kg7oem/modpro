@@ -184,6 +184,9 @@ void audio::processor::init_dsp()
                 for (auto l : k.second) {
                     auto dest = parse_effect_port_string(l.as<std::string>());
                     std::cout << "  wiring " << effect_name << "." << src_port_name << " to " << dest.first << "." << dest.second << std::endl;
+                    if (chain_effects.count(dest.first) == 0) {
+                        throw std::runtime_error("could not find effect named "  + dest.first);
+                    }
                     auto dest_effect = chain_effects[dest.first];
                     dest_effect->connect(dest.second, buf);
                 }
@@ -262,6 +265,9 @@ void audio::processor::handle_process(modpro::jackaudio::nframes_type nframes)
 
     for(auto i : jack_connections) {
         auto effect_port = parse_effect_port_string(i.first);
+        if (chain_effects.count(effect_port.first) == 0) {
+            throw std::runtime_error("could not find effect named "  + effect_port.first);
+        }
         auto effect = chain_effects[effect_port.first];
         effect->connect(effect_port.second, i.second->get_buffer(nframes));
     }
@@ -275,6 +281,9 @@ void audio::processor::handle_process(modpro::jackaudio::nframes_type nframes)
     for(auto i : jack_connections) {
         auto effect_port = parse_effect_port_string(i.first);
         auto effect = chain_effects[effect_port.first];
+        if (chain_effects.count(effect_port.first) == 0) {
+            throw std::runtime_error("could not find effect named "  + effect_port.first);
+        }
         effect->disconnect(effect_port.second);
     }
 

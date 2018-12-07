@@ -67,6 +67,10 @@ ladspa::file * ladspa::open(const std::string path_in)
 
 ladspa::type * ladspa::get_type(const id_type id_in)
 {
+    if (loaded_types.count(id_in) == 0) {
+        throw std::runtime_error("could not get type for ladspa ID: " + std::to_string(id_in));
+    }
+
     return loaded_types[id_in];
 }
 
@@ -77,6 +81,10 @@ std::shared_ptr<ladspa::instance> ladspa::instantiate(const id_type id_in, const
 
 std::shared_ptr<ladspa::instance> ladspa::instantiate(const std::string name_in, const size_type sample_rate_in)
 {
+    if (name_to_id.count(name_in) == 0) {
+        throw std::runtime_error("could not find plugin by name: " + name_in);
+    }
+
     return instantiate(name_to_id[name_in], sample_rate_in);
 }
 
