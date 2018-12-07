@@ -5,22 +5,21 @@ plugins:
   - /usr/lib/ladspa/delay_1898.so
   - /usr/lib/ladspa/ZamGEQ31-ladspa.so
   - /usr/lib/ladspa/ZamGate-ladspa.so
+  - /usr/lib/ladspa/ZamTube-ladspa.so
 
 routes:
-  - [ system:capture_1, ModPro:transmit_in_1 ]
-  - [ ModPro:transmit_out_1, "IC-7100 Out:playback_1" ]
-  - [ "IC-7100 In:capture_1", ModPro:receive_in_1 ]
-  - [ ModPro:receive_out_1, system:playback_1 ]
-  - [ ModPro:receive_out_1, system:playback_2 ]
+  - [ ModPro:receive_out_1, "system:playback_1" ]
+  - [ ModPro:receive_out_1, "system:playback_2" ]
+  - [ "Network In:out_1", ModPro:receive_in_1 ]
 
 chains:
   receive:
     inputs:
-      - gain.Input
+      - input_gain.Input
     outputs:
-      - gate.Audio Output 1
+      - output_gain.Output
     effects:
-      - name: gain
+      - name: input_gain
         type: Simple amplifier
         controls:
           Amps gain (dB): 0
@@ -44,6 +43,24 @@ chains:
           Attack: 25
           Release: 25
           Max gate close: -.inf
+        wires:
+          Audio Output 1:
+            - tube.Audio Input 1
+      - name: tube
+        type: ZamTube
+        controls:
+          Tone Stack Model: 0 # 0 - 24
+          Tube Drive: 0
+          Bass: -2
+          Mids: 0
+          Treble: 0
+        wires:
+          Audio Output 1:
+            - output_gain.Input
+      - name: output_gain
+        type: Simple amplifier
+        controls:
+          Amps gain (dB): 6
   transmit:
     inputs:
       - eq.Audio Input 1
