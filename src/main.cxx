@@ -34,7 +34,7 @@ void handle_audio_stopped(bool * should_run_p_in)
 
 void handle_audio_client_changed(shared_ptr<audio::processor> processor_in)
 {
-
+    processor_in->check_auto_connect();
 }
 
 void process_audio(const char * conf_path)

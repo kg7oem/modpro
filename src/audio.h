@@ -65,7 +65,6 @@ struct audio {
 
         void init_jack();
         void init_dsp();
-        void check_auto_connect();
         std::pair<const std::string, const std::string> parse_effect_port_string(const std::string string_in);
 
         public:
@@ -82,8 +81,11 @@ struct audio {
         void init();
         void start();
         void set_auto_connect(const std::string source_in, const std::string dest_in);
+        void check_auto_connect();
         virtual void handle_client_register(const std::string client_name_in);
         virtual void handle_client_unregister(const std::string client_name_in);
+        virtual void handle_port_register(const uint32_t port_id_in);
+        virtual void handle_port_unregister(const uint32_t port_id_in);
         virtual void handle_shutdown();
         virtual void handle_process(modpro::jackaudio::nframes_type nframes);
         virtual void handle_sample_rate_change(modpro::jackaudio::nframes_type sample_rate_in);

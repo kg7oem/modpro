@@ -251,12 +251,22 @@ void audio::processor::check_auto_connect()
 
 void audio::processor::handle_client_register(const std::string client_name_in)
 {
-    broker->send_event(event::name::audio_client_change);
+    // broker->send_event(event::name::audio_client_change);
 }
 
 void audio::processor::handle_client_unregister(const std::string client_name_in)
 {
+    // broker->send_event(event::name::audio_client_change);
+}
+
+void audio::processor::handle_port_register(const uint32_t port_id_in)
+{
     broker->send_event(event::name::audio_client_change);
+}
+
+void audio::processor::handle_port_unregister(const uint32_t port_id_in)
+{
+    // broker->send_event(event::name::audio_client_change);
 }
 
 // inside jack audio thread - jack is already locked

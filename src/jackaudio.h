@@ -40,6 +40,8 @@ struct jackaudio {
         virtual void handle_process(nframes_type nframes_in) = 0;
         virtual void handle_client_register(const std::string client_name_in) = 0;
         virtual void handle_client_unregister(const std::string client_name_in) = 0;
+        virtual void handle_port_register(const uint32_t port_id_in) = 0;
+        virtual void handle_port_unregister(const uint32_t port_id_in) = 0;
         virtual void handle_sample_rate_change(nframes_type rate_in) = 0;
         virtual void handle_buffer_size_change(nframes_type buffer_size_in) = 0;
     };

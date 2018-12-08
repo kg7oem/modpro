@@ -14,6 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <cassert>
+#include <inttypes.h>
 #include <functional>
 #include <iostream>
 #include <string>
@@ -63,6 +64,14 @@ static void wrap_string_int_cb(const char * string_in, const int register_in, vo
     auto p = static_cast<std::function<void(const std::string, const int)> *>(arg);
     auto cb = *p;
     cb(string_in, register_in);
+}
+
+static void wrap_uint32_int_cb(const uint32_t uint32_in, const int register_in, void * arg)
+{
+    // FIXME what is the syntax to cast/dereference this well?
+    auto p = static_cast<std::function<void(const uint32_t, const int)> *>(arg);
+    auto cb = *p;
+    cb(uint32_in, register_in);
 }
 
 void jackaudio::client::open()
@@ -138,6 +147,22 @@ void jackaudio::client::open()
                 this->handler->handle_client_register(client_name_in);
             } else {
                 this->handler->handle_client_unregister(client_name_in);
+            }
+    }))))
+    {
+        throw std::runtime_error("could not set jack buffer size callback");
+    }
+
+    // FIXME leaks memory because the std::function never gets delete called
+    if(jack_set_port_registration_callback(
+        client_p,
+        wrap_uint32_int_cb,
+        static_cast<void *>(new std::function<void(const uint32_t port_id_in, const int register_in)>([this](const uint32_t port_id_in, const int register_in) -> void {
+            auto lock = get_lock();
+            if (register_in) {
+                this->handler->handle_port_register(port_id_in);
+            } else {
+                this->handler->handle_port_unregister(port_id_in);
             }
     }))))
     {
