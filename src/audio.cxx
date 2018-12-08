@@ -237,13 +237,14 @@ void audio::processor::handle_shutdown()
 
 void audio::processor::check_auto_connect()
 {
-    // FIXME this doesn't really seem good enough
-    for(auto i : auto_connect) {
-        for (auto j : i.second ) {
-            std::cout << "Auto connect: " << i.first << " -> " << j << std::endl;
-            auto result = jack->connect_port(i.first, j);
-            if (result != 0 && result != EEXIST) {
-                std::cout << "Error trying to connect ports: " << i.first << " -> " << j << std::endl;
+    for(auto client_port : jack->get_known_port_names()) {
+        if (auto_connect.count(client_port) > 0) {
+            for (auto destination : auto_connect[client_port] ) {
+                std::cout << "Auto connect: " << client_port << " -> " << destination << std::endl;
+                auto result = jack->connect_port(client_port, destination);
+                if (result != 0 && result != EEXIST) {
+                    std::cout << "Error trying to connect ports: " << client_port << " -> " << destination << std::endl;
+                }
             }
         }
     }

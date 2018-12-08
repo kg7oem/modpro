@@ -62,6 +62,7 @@ struct audio {
         std::shared_ptr<modpro::ladspa> ladspa;
         std::vector<sample_type *> buffers;
         std::map<std::string, std::shared_ptr<modpro::chain>> chains;
+        std::map<std::string, std::vector<std::string>> jack_routes;
 
         void init_jack();
         void init_dsp();

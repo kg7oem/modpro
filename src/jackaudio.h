@@ -75,6 +75,7 @@ struct jackaudio {
         nframes_type get_sample_rate();
         nframes_type get_buffer_size();
         std::vector<std::string> get_known_client_names();
+        std::vector<std::string> get_known_port_names();
         std::shared_ptr<audio_port> add_audio_input(const std::string name_in);
         std::shared_ptr<audio_port> add_audio_output(const std::string name_in);
         int connect_port(const std::string source_in, const std::string dest_in);

@@ -206,13 +206,25 @@ jackaudio::nframes_type jackaudio::client::get_buffer_size()
     return buffer_size;
 }
 
-std::vector<std::string> jackaudio::client::get_known_client_names()
+std::vector<std::string> jackaudio::client::get_known_port_names()
 {
     const char ** known_ports = jack_get_ports(client_p, ".", ".", 0);
-    std::vector<std::string> client_names;
+    std::vector<std::string> retval;
 
     for (int i = 0; known_ports[i] != nullptr; i++) {
         std::string client_and_port(known_ports[i]);
+        retval.push_back(client_and_port);
+    }
+
+    jack_free(known_ports);
+    return retval;
+}
+
+std::vector<std::string> jackaudio::client::get_known_client_names()
+{
+    std::vector<std::string> retval;
+
+    for (auto client_and_port : get_known_port_names()) {
         auto colon_pos = client_and_port.find(":");
 
         std::cout << "Port: " << client_and_port << std::endl;
@@ -221,11 +233,10 @@ std::vector<std::string> jackaudio::client::get_known_client_names()
             throw std::runtime_error("invalid client/port name from jack");
         }
 
-        client_names.push_back(client_and_port.substr(0, colon_pos));
+        retval.push_back(client_and_port.substr(0, colon_pos));
     }
 
-    jack_free(known_ports);
-    return client_names;
+    return retval;
 }
 
 
