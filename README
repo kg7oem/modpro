@@ -3,6 +3,7 @@ Packages needed to build and run on Debian Stretch and Ubuntu Bionic
 build-essential
 jackd2
 ladspa-sdk
+libdbus-1-dev
 libdbus-c++-dev
 libjack-jackd2-dev
 libyaml-cpp-dev
