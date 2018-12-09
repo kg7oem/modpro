@@ -80,8 +80,8 @@ audio::sample_type * audio::make_buffer(const audio::size_type size_in)
     return static_cast<audio::sample_type *>(new_buffer);
 }
 
-audio::processor::processor(const std::string conf_file_path_in, std::shared_ptr<event::broker> broker_in)
-: config(conf_file_path_in), broker(broker_in)
+audio::processor::processor(const std::string conf_file_path_in, std::shared_ptr<event::broker> broker_in, std::shared_ptr<dbus> dbus_broker_in)
+: DBus::ObjectAdaptor(dbus_broker_in->connection, MODPRO_DBUS_PROCESSOR_PATH), config(conf_file_path_in), broker(broker_in), dbus_broker(dbus_broker_in)
 {
 
 }
@@ -138,15 +138,19 @@ void audio::processor::init_dsp()
         }
 
         std::cout << "Creating new chain: " << chain_name << std::endl;
-        auto new_chain = std::make_shared<modpro::chain>(chain_name);
+        auto new_chain = std::make_shared<modpro::chain>(chain_name, dbus_broker);
         chains[chain_name] = new_chain;
 
         for (auto j : effects_node) {
             auto effect_name = j["name"].as<std::string>();
             auto effect_type_name = j["type"].as<std::string>();
 
+            std::string dbus_path(modpro::chain::make_dbus_path(chain_name));
+            dbus_path += "/";
+            dbus_path += effect_name;
+
             std::cout << "  creating new effect: " << effect_name << " = " << effect_type_name << std::endl;
-            auto effect = make_effect(effect_type_name);
+            auto effect = make_effect(effect_type_name, dbus_path, dbus_broker);
 
             for (auto k : j["controls"]) {
                 auto control_name = k.first.as<std::string>();
@@ -310,9 +314,9 @@ void audio::processor::handle_buffer_size_change(modpro::jackaudio::nframes_type
     throw std::runtime_error("unable to change maximum buffer size");
 }
 
-audio::processor::effect_type audio::processor::make_effect(const std::string name_in)
+audio::processor::effect_type audio::processor::make_effect(const std::string name_in, const std::string dbus_path_in, std::shared_ptr<dbus> dbus_broker_in)
 {
-    auto new_effect = ladspa->instantiate(name_in, jack->get_sample_rate());
+    auto new_effect = ladspa->instantiate(name_in, jack->get_sample_rate(), dbus_path_in, dbus_broker);
     return new_effect;
 }
 

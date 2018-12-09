@@ -22,8 +22,11 @@
 #include <vector>
 
 #include "chain.h"
+#include "dbus.h"
 #include "jackaudio.h"
 #include "ladspa.h"
+
+#define MODPRO_DBUS_PROCESSOR_PATH "/modpro/Processor"
 
 namespace modpro {
 
@@ -43,7 +46,7 @@ struct audio {
         YAML::Node get_routes();
     };
 
-    class processor : public modpro::jackaudio::handlers, public std::enable_shared_from_this<processor> {
+    class processor : public modpro::jackaudio::handlers, public hamradio::modpro::processor_adaptor, public DBus::IntrospectableAdaptor, public DBus::ObjectAdaptor, public std::enable_shared_from_this<processor> {
         public:
         using effect_type = std::shared_ptr<modpro::effect>;
         using sample_type = modpro::audio::sample_type;
@@ -53,6 +56,7 @@ struct audio {
         // FIXME do these bools need to be atomic?
         audio::config config;
         std::shared_ptr<event::broker> broker;
+        std::shared_ptr<dbus> dbus_broker;
         bool initialized = false;
         bool activated = false;
         std::map<const std::string, std::vector<std::string>> auto_connect;
@@ -69,7 +73,7 @@ struct audio {
         std::pair<const std::string, const std::string> parse_effect_port_string(const std::string string_in);
 
         public:
-        processor(const std::string conf_path_in, std::shared_ptr<event::broker> broker_in);
+        processor(const std::string conf_path_in, std::shared_ptr<event::broker> broker_in, std::shared_ptr<dbus> dbus_broker_in);
         virtual ~processor() { }
         template<typename... Args>
         static std::shared_ptr<processor> make(Args... args)
@@ -91,7 +95,7 @@ struct audio {
         virtual void handle_process(modpro::jackaudio::nframes_type nframes);
         virtual void handle_sample_rate_change(modpro::jackaudio::nframes_type sample_rate_in);
         virtual void handle_buffer_size_change(modpro::jackaudio::nframes_type buffer_size_in);
-        effect_type make_effect(const std::string name_in);
+        effect_type make_effect(const std::string name_in, const std::string dbus_path_in, std::shared_ptr<dbus> dbus_broker_in);
         sample_type * make_buffer();
     };
 

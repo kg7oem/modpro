@@ -17,19 +17,24 @@
 #include <memory>
 #include <string>
 
+#include "dbus.h"
 #include "effect.h"
 #include "jackaudio.h"
 
+#define MODPRO_DBUS_CHAIN_PREFIX "/modpro/Chain"
+
 namespace modpro {
 
-struct chain : public std::enable_shared_from_this<chain> {
+struct chain : public hamradio::modpro::chain_adaptor, public DBus::IntrospectableAdaptor, public DBus::ObjectAdaptor, public std::enable_shared_from_this<chain> {
     const std::string name;
     std::map<std::string, std::shared_ptr<effect>> effect_instances;
     std::vector<std::shared_ptr<effect>> run_list;
     std::vector<std::pair<std::string, std::shared_ptr<jackaudio::audio_port>>> jack_connections;
+    std::shared_ptr<dbus> dbus_broker;
 
     public:
-    chain(const std::string name_in);
+    chain(const std::string name_in, std::shared_ptr<dbus> dbus_broker_in);
+    static const std::string make_dbus_path(const std::string name_in);
     void activate();
     void run(const effect::size_type sample_count_in);
     void add_effect(const std::string name_in, std::shared_ptr<effect> effect_in);

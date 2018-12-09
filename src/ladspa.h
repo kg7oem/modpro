@@ -18,8 +18,10 @@
 #include <ladspa.h>
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
 
+#include "dbus.h"
 #include "effect.h"
 
 namespace modpro {
@@ -54,14 +56,19 @@ struct ladspa : public std::enable_shared_from_this<ladspa> {
         std::map<const id_type, bool> port_is_connected;
 
     public:
-        instance(const LADSPA_Handle handle_in, ladspa::type * type_in);
+        instance(const LADSPA_Handle handle_in, ladspa::type * type_in, const std::string dbus_prefix_in, std::shared_ptr<dbus> dbus_broker_in);
         std::vector<ladspa::port *> get_ports();
+        std::vector<std::string> get_control_names();
         virtual const std::string get_name() override;
         virtual const std::string get_label() override;
         ladspa::port * get_port(const std::string port_name_in);
         ladspa::type * get_type();
         data_type get_control(const id_type id_in);
         data_type get_control(const std::string name_in);
+        virtual double read(const std::string & name_i);
+        std::map<std::string, double> read_all();
+        virtual void write(const std::string & name_in, const double & value_in);
+        virtual double knudge(const std::string & name_in, const double & value_in);
         void set_control(const id_type id_in, ladspa::data_type value_in);
         void set_control(const std::string name_in, ladspa::data_type value_in);
         void connect(const id_type portnum_in, data_type * buffer_in);
@@ -91,7 +98,7 @@ struct ladspa : public std::enable_shared_from_this<ladspa> {
         const std::string get_name();
         port * get_port(const id_type number_in);
         port * get_port(const std::string port_name_in);
-        std::shared_ptr<instance> instantiate(const size_type sample_rate_in);
+        std::shared_ptr<instance> instantiate(const size_type sample_rate_in, const std::string dbus_path_in, std::shared_ptr<dbus> dbus_broker_in);
     };
 
     struct port {
@@ -121,8 +128,8 @@ struct ladspa : public std::enable_shared_from_this<ladspa> {
 
     file * open(const std::string path_in);
     type * get_type(const id_type id_in);
-    std::shared_ptr<instance> instantiate(const id_type id_in, const size_type sample_rate_in);
-    std::shared_ptr<instance> instantiate(const std::string name_in, const size_type sample_rate_in);
+    std::shared_ptr<instance> instantiate(const id_type id_in, const size_type sample_rate_in, const std::string dbus_name_in, std::shared_ptr<dbus> dbus_broker_in);
+    std::shared_ptr<instance> instantiate(const std::string name_in, const size_type sample_rate_in, const std::string dbus_name_in, std::shared_ptr<dbus> dbus_broker_in);
 };
 
 }

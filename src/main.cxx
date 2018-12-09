@@ -16,6 +16,7 @@
 #include <iostream>
 
 #include "audio.h"
+#include "dbus.h"
 #include "event.h"
 
 using namespace std;
@@ -40,12 +41,17 @@ void handle_audio_client_changed(shared_ptr<audio::processor> processor_in)
 void process_audio(const char * conf_path)
 {
     bool should_run = true;
-    auto broker = make_shared<event::broker>();
-    auto processor = audio::processor::make(conf_path, broker);
+
+    auto dbus_broker = dbus::make();
+    dbus_broker->start();
+
+    auto event_broker = make_shared<event::broker>();
+    auto processor = audio::processor::make(conf_path, event_broker, dbus_broker);
+
     processor->start();
 
     while(should_run) {
-        auto event = broker->get_event();
+        auto event = event_broker->get_event();
 
         switch (event) {
             case event::name::audio_started: handle_audio_started(); break;

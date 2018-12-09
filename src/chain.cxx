@@ -19,9 +19,18 @@
 
 namespace modpro {
 
-chain::chain(const std::string name_in) : name(name_in)
+chain::chain(const std::string name_in, std::shared_ptr<dbus> dbus_broker_in)
+:  DBus::ObjectAdaptor(dbus_broker_in->connection, make_dbus_path(name_in)), name(name_in)
 {
 
+}
+
+const std::string chain::make_dbus_path(const std::string name_in)
+{
+    auto buf = std::string(MODPRO_DBUS_CHAIN_PREFIX);
+    buf += "/";
+    buf += name_in;
+    return buf;
 }
 
 void chain::activate()

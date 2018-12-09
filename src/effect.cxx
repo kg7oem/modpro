@@ -18,17 +18,23 @@
 #include <string>
 #include <vector>
 
+#include "dbus.h"
 #include "effect.h"
 
 namespace modpro {
 
 static effect::size_type next_effect_id = 0;
 
-effect::effect()
+effect::effect(const std::string dbus_path_in, std::shared_ptr<dbus> dbus_broker_in)
 // FIXME this needs to be made atomic
-: effect_id(next_effect_id++)
+: DBus::ObjectAdaptor(dbus_broker_in->connection, dbus_path_in), effect_id(next_effect_id++)
 {
 
+}
+
+std::unique_lock<std::mutex> effect::get_lock()
+{
+    return std::unique_lock<std::mutex>(effect_mutex);
 }
 
 }

@@ -21,12 +21,19 @@
 
 namespace modpro {
 
-struct effect {
+struct effect : public hamradio::modpro::effect_adaptor, public DBus::IntrospectableAdaptor, public DBus::ObjectAdaptor {
     using sample_type = float;
     using data_type = float;
     using size_type = unsigned long;
 
+    std::mutex effect_mutex;
+    std::shared_ptr<dbus> dbus_broker;
+
+    protected:
+    std::unique_lock<std::mutex> get_lock();
+
     public:
+    effect(const std::string dbus_path_in, std::shared_ptr<dbus> dbus_broker_in);
     const size_type effect_id;
     virtual const std::string get_name() = 0;
     virtual const std::string get_label() = 0;
@@ -36,7 +43,9 @@ struct effect {
     virtual void disconnect(const std::string name_in) = 0;
     virtual void activate() = 0;
     virtual void run(size_type sample_count) = 0;
-    effect();
+    virtual double read(const std::string & name_in) = 0;
+    virtual void write(const std::string & name_in, const double & value_in) = 0;
+    virtual double knudge(const std::string & name_in, const double & value_in) = 0;
 };
 
 }

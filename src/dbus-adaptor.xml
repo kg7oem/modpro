@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+
+<node>
+    <interface name="hamradio.modpro.processor">
+        <method name="check_auto_connect"/>
+    </interface>
+
+    <interface name="hamradio.modpro.chain">
+
+    </interface>
+
+    <interface name="hamradio.modpro.effect">
+        <method name="read">
+            <arg name="value" type="d" direction="out"/>
+            <arg name="control" type="s" direction="in"/>
+        </method>
+        <method name="read_all">
+            <arg name="name_list" type="a{sd}" direction="out"/>
+        </method>
+        <method name="write">
+            <arg name="control" type="s" direction="in"/>
+            <arg name="value" type="d" direction="in"/>
+        </method>
+        <method name="knudge">
+            <arg name="new_value" type="d" direction="out"/>
+            <arg name="control" type="s" direction="in"/>
+            <arg name="value" type="d" direction="in"/>
+        </method>
+        <method name="get_control_names">
+            <arg name="names" type="as" direction="out"/>
+        </method>
+    </interface>
+</node>
