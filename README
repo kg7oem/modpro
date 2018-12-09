@@ -10,6 +10,9 @@ libyaml-cpp-dev
 swh-plugins
 zam-plugins
 
+Using zam-plugins 3.9 is recommend but Stretch only has 3.7 in backports.
+Try downloading the binary package from https://packages.debian.org/sid/zam-plugins
+
 Copyright (C) 2018  Tyler Riddle <cardboardaardvark@gmail.com>
 
 This program is free software: you can redistribute it and/or modify
