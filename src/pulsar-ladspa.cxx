@@ -173,6 +173,14 @@ const pulsar::data_type instance::handle_peek__l(const std::string &name_in)
 void instance::handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in)
 {
     auto port_num = get_port_num(name_in);
+    auto port_descriptor = get_port_num(name_in);
+
+    if (! LADSPA_IS_PORT_CONTROL(port_descriptor)) {
+        throw std::runtime_error("attempt to poke a ladspa port that was not a control port");
+    } else if (! LADSPA_IS_PORT_INPUT(port_descriptor)) {
+        throw std::runtime_error("attempt to poke an output port");
+    }
+
     control_buffers[port_num] = value_in;
 }
 

@@ -82,6 +82,8 @@ int main(int argc, const char *argv[])
 
     instance->connect("Input", edge);
 
+    instance->peek("Input");
+
     cout << "Peek: " << instance->peek("Delay Time (s)") << endl;
     instance->poke("Delay Time (s)", 1);
     cout << "After poke: " << instance->peek("Delay Time (s)") << endl;
