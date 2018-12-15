@@ -43,11 +43,6 @@ node::~node()
 
 }
 
-bool node::is_ready__l()
-{
-    return ready;
-}
-
 bool node::is_ready()
 {
     auto lock = get_lock();
@@ -76,6 +71,12 @@ void node::set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar
     edge_in->output_name = name_in;
 }
 
+void node::set_input_buffer(const std::string &name_in, data_type * buffer_in)
+{
+    auto lock = get_lock();
+    set_input_buffer__l(name_in, buffer_in);
+}
+
 data_type * node::get_output_buffer(const std::string &name_in)
 {
     auto lock = get_lock();
@@ -84,7 +85,59 @@ data_type * node::get_output_buffer(const std::string &name_in)
 
 std::shared_ptr<edge> node::make_output_edge(const std::string &name_in)
 {
-    return std::make_shared<edge>(this, name_in);
+    auto new_edge = std::make_shared<edge>(this, name_in);
+    created_output_edges.push_back(new_edge);
+    return new_edge;
+}
+
+root::root(std::shared_ptr<pulsar::domain> domain_in)
+: node(domain_in)
+{
+
+}
+
+root::~root()
+{
+
+}
+
+bool root::is_ready__l()
+{
+    return buffer != nullptr;
+}
+
+void root::set_input_buffer__l(const std::string &name_in, data_type * buffer_in)
+{
+    throw std::runtime_error("can not set input buffer for a root node");
+}
+
+void root::set_output_buffer__l(data_type * buffer_in)
+{
+    buffer = buffer_in;
+
+    for (auto i : created_output_edges) {
+        i->input_node->set_input_buffer(i->input_name, buffer);
+    }
+}
+
+void root::set_output_buffer(data_type * buffer_in)
+{
+    auto lock = get_lock();
+    set_output_buffer__l(buffer_in);
+}
+
+data_type * root::get_output_buffer__l(const std::string &name_in)
+{
+    // if (name_in != "output") {
+    //     throw std::runtime_error("root nodes only have 1 output named 'output'");
+    // }
+
+    return buffer;
+}
+
+void root::connect(const std::string &name_in, std::shared_ptr<pulsar::edge>)
+{
+    throw std::runtime_error("root nodes can not be connected to");
 }
 
 domain::domain(const size_type &sample_rate_in, const size_type &buffer_size_in)
@@ -104,10 +157,24 @@ effect::~effect()
 
 }
 
+data_type * domain::make_buffer()
+{
+    auto buffer = static_cast<data_type *>(calloc(buffer_size, sizeof(data_type)));
+    if (buffer == nullptr) {
+        throw std::runtime_error("could not allocate buffer");
+    }
+    return buffer;
+}
+
 void effect::activate()
 {
     auto lock = get_lock();
     return handle_activate__l();
+}
+
+bool effect::is_ready__l()
+{
+    return ready;
 }
 
 void effect::run(const size_type &num_samples_in)
@@ -120,11 +187,11 @@ void effect::run(const size_type &num_samples_in)
         }
     }
 
-    for(auto output_name : get_outputs__l()) {
-        if (output_edges.count(output_name) == 0) {
-            throw std::runtime_error("attempt to run node with an unconnected output");
-        }
-    }
+    // for(auto output_name : get_outputs__l()) {
+    //     if (output_edges.count(output_name) == 0) {
+    //         throw std::runtime_error("attempt to run node with an unconnected output");
+    //     }
+    // }
 
     for(auto edge : input_edges) {
         if (! edge.second->output_node->is_ready()) {

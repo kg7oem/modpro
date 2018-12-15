@@ -187,7 +187,7 @@ void instance::connect(const std::string &name_in, std::shared_ptr<pulsar::edge>
         assert(edge_in->output_node != nullptr);
 
         auto output_buffer = edge_in->output_node->get_output_buffer(name_in);
-        descriptor->connect_port(handle, port_num, output_buffer);
+        set_input_buffer__l(name_in, output_buffer);
         set_input_edge__l(name_in, edge_in);
     } else if (LADSPA_IS_PORT_OUTPUT(port_descriptor)) {
         throw std::runtime_error("use make_output_edge() instead of connect() with an audio output");
@@ -292,6 +292,12 @@ const std::vector<std::string> instance::get_outputs__l()
     }
 
     return names;
+}
+
+void instance::set_input_buffer__l(const std::string &name_in, data_type * buffer_in)
+{
+    auto port_num = get_port_num(name_in);
+    descriptor->connect_port(handle, port_num, buffer_in);
 }
 
 data_type * instance::get_output_buffer__l(const std::string &name_in)

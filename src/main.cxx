@@ -72,16 +72,27 @@ int main(int argc, const char *argv[])
     cout << "main(): starting" << endl;
 
     auto domain = make_shared<pulsar::domain>(SAMPLE_RATE, BUFFER_SIZE);
+
+    auto root = make_shared<pulsar::root>(domain);
+    auto buffer = domain->make_buffer();
+    root->set_output_buffer(buffer);
+
     auto plugin = make_shared<pulsar::ladspa::file>("/usr/lib/ladspa/delay_1898.so");
     auto instance = plugin->make_instance(domain, "delay_n");
-
     cout << "main(): done with variables" << endl;
 
     instance->activate();
-    std::cout << "main(): done with activate()" << endl;
+    cout << "main(): done with activate()" << endl;
+
+    instance->connect("Input", root->make_output_edge("output"));
+    cout << "main(): done connecting" << endl;
 
     instance->run(BUFFER_SIZE);
-    cout << "main(): done with run()" << endl;
+    cout << "main(): done with first run()" << endl;
+
+    root->set_output_buffer(nullptr);
+    instance->run(BUFFER_SIZE);
+    cout << "main(): done with second run()" << endl;
 
     cout << "main(): returning" << endl;
     return 0;
