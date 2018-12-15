@@ -216,7 +216,7 @@ const pulsar::data_type instance::handle_get_default__l(const std::string &name_
         return port_hints.UpperBound;
     }
 
-    throw std::logic_error("could not find hit for ladspa plugin " + file->path + " " + label);
+    throw std::logic_error("could not find hint for ladspa plugin " + file->path + " " + label);
 }
 
 } // namespace ladspa
