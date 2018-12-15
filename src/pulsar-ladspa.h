@@ -57,6 +57,7 @@ namespace ladspa {
         virtual void handle_run__l(const pulsar::size_type &num_samples_in) override;
         virtual const pulsar::data_type handle_peek__l(const std::string &name_in) override;
         virtual void handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in) override;
+        virtual const pulsar::data_type handle_get_default__l(const std::string &name_in) override;
 
         public:
         const ladspa::size_type &sample_rate;

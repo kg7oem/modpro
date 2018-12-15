@@ -86,5 +86,10 @@ effect::~effect()
 
 }
 
+const pulsar::data_type effect::get_default(const std::string &name_in)
+{
+    auto lock = get_lock();
+    return handle_get_default__l(name_in);
 }
 
+}

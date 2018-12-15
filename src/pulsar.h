@@ -70,6 +70,7 @@ class effect : public node {
     virtual void handle_run__l(const pulsar::size_type &num_samples_in) = 0;
     virtual const pulsar::data_type handle_peek__l(const std::string &name_in) = 0;
     virtual void handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in) = 0;
+    virtual const pulsar::data_type handle_get_default__l(const std::string &name_in) = 0;
 
     public:
     virtual ~effect();
@@ -78,6 +79,7 @@ class effect : public node {
     const pulsar::data_type peek(const std::string &name_in);
     void poke(const std::string &name_in, const pulsar::data_type &value_in);
     const pulsar::data_type knudge(const std::string &name_in, const pulsar::data_type &value_in);
+    const pulsar::data_type get_default(const std::string &name_in);
 };
 
 }

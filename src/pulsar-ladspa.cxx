@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include <cmath>
 #include <cstdlib>
 #include <dlfcn.h>
 
@@ -106,7 +107,7 @@ instance::instance(std::shared_ptr<ladspa::file> file_in, const std::string &lab
     for(id_type i = 0; i < descriptor->PortCount; i++) {
         auto port_descriptor = descriptor->PortDescriptors[i];
         if (LADSPA_IS_PORT_CONTROL(port_descriptor)) {
-            control_buffers[i] = 0;
+            control_buffers[i] = get_default(descriptor->PortNames[i]);
             descriptor->connect_port(handle, i, &control_buffers[i]);
         }
     }
@@ -173,6 +174,49 @@ void instance::handle_poke__l(const std::string &name_in, const pulsar::data_typ
 {
     auto port_num = get_port_num(name_in);
     control_buffers[port_num] = value_in;
+}
+
+const pulsar::data_type instance::handle_get_default__l(const std::string &name_in)
+{
+    auto port_num = get_port_num(name_in);
+    auto port_hints = descriptor->PortRangeHints[port_num];
+    auto hint_descriptor = port_hints.HintDescriptor;
+
+    if (! LADSPA_IS_HINT_HAS_DEFAULT(hint_descriptor)) {
+        return 0;
+    } else if (LADSPA_IS_HINT_DEFAULT_0(hint_descriptor)) {
+        return 0;
+    } else if (LADSPA_IS_HINT_DEFAULT_1(hint_descriptor)) {
+        return 1;
+    } else if (LADSPA_IS_HINT_DEFAULT_100(hint_descriptor)) {
+        return 100;
+    } else if (LADSPA_IS_HINT_DEFAULT_440(hint_descriptor)) {
+        return 440;
+    } else if (LADSPA_IS_HINT_DEFAULT_MINIMUM(hint_descriptor)) {
+        return port_hints.LowerBound;
+    } else if (LADSPA_IS_HINT_DEFAULT_LOW(hint_descriptor)) {
+        if (LADSPA_IS_HINT_LOGARITHMIC(hint_descriptor)) {
+            return exp(log(port_hints.LowerBound) * 0.75 + log(port_hints.UpperBound) * 0.25);
+        } else {
+            return port_hints.LowerBound * 0.75 + port_hints.UpperBound * 0.25;
+        }
+    } else if (LADSPA_IS_HINT_DEFAULT_MIDDLE(hint_descriptor)) {
+        if (LADSPA_IS_HINT_LOGARITHMIC(hint_descriptor)) {
+            return exp(log(port_hints.LowerBound) * 0.5 + log(port_hints.UpperBound) * 0.5);
+        } else {
+            return (port_hints.LowerBound * 0.5 + port_hints.UpperBound * 0.5);
+        }
+    } else if (LADSPA_IS_HINT_DEFAULT_HIGH(hint_descriptor)) {
+        if (LADSPA_IS_HINT_LOGARITHMIC(hint_descriptor)) {
+            return exp(log(port_hints.LowerBound) * 0.25 + log(port_hints.UpperBound) * 0.75);
+        } else {
+            return port_hints.LowerBound * 0.25 + port_hints.UpperBound * 0.75;
+        }
+    } else if (LADSPA_IS_HINT_DEFAULT_MAXIMUM(hint_descriptor)) {
+        return port_hints.UpperBound;
+    }
+
+    throw std::logic_error("could not find hit for ladspa plugin " + file->path + " " + label);
 }
 
 } // namespace ladspa
