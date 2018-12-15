@@ -77,16 +77,12 @@ int main(int argc, const char *argv[])
         cout << endl;
     }
 
+    auto input_edge = make_shared<pulsar::edge>(BUFFER_SIZE);
+    auto output_edge = make_shared<pulsar::edge>(BUFFER_SIZE);
     auto instance = plugin->make_instance("delay_n", SAMPLE_RATE);
-    auto edge = make_shared<pulsar::edge>(BUFFER_SIZE);
+    instance->connect("Input", input_edge);
+    instance->connect("Output", output_edge);
 
-    instance->connect("Input", edge);
-
-    instance->peek("Input");
-
-    cout << "Peek: " << instance->peek("Delay Time (s)") << endl;
-    instance->poke("Delay Time (s)", 1);
-    cout << "After poke: " << instance->peek("Delay Time (s)") << endl;
-    instance->knudge("Delay Time (s)", 2);
-    cout << "After knudge: " << instance->peek("Delay Time (s)") << endl;
+    instance->activate();
+    instance->run(BUFFER_SIZE);
 }

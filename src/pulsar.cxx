@@ -39,6 +39,25 @@ edge::~edge()
     }
 }
 
+void edge::set_ready__l()
+{
+    ready = true;
+}
+
+void edge::clear_ready__l()
+{
+    ready = false;
+}
+
+const bool edge::is_ready__l()
+{
+    if (input == nullptr) {
+        return true;
+    }
+
+    return ready;
+}
+
 void edge::set_input__l(pulsar::node * input_in)
 {
     input = input_in;
@@ -86,6 +105,43 @@ effect::~effect()
 
 }
 
+void effect::activate()
+{
+    auto lock = get_lock();
+    return handle_activate__l();
+}
+
+void effect::run(const size_type &num_samples_in)
+{
+    auto lock = get_lock();
+
+    for(auto input_name : get_inputs()) {
+        if (input_edges.count(input_name) == 0) {
+            throw std::runtime_error("attempt to run node with an unconnected input");
+        }
+    }
+
+    for(auto output_name : get_outputs()) {
+        if (output_edges.count(output_name) == 0) {
+            throw std::runtime_error("attempt to run node with an unconnected output");
+        }
+    }
+
+    for(auto edge : input_edges) {
+        auto edge_lock = edge.second->get_lock();
+        if (! edge.second->is_ready__l()) {
+            throw std::runtime_error("attempt to run node with an edge that was not ready");
+        }
+    }
+
+    handle_run__l(num_samples_in);
+
+    for(auto edge : output_edges) {
+        auto edge_lock = edge.second->get_lock();
+        edge.second->set_ready__l();
+    }
+}
+
 const pulsar::data_type effect::peek(const std::string &name_in)
 {
     auto lock = get_lock();
@@ -113,6 +169,18 @@ const pulsar::data_type effect::get_default(const std::string &name_in)
 {
     auto lock = get_lock();
     return handle_get_default__l(name_in);
+}
+
+const std::vector<std::string> effect::get_inputs()
+{
+    auto lock = get_lock();
+    return handle_get_inputs__l();
+}
+
+const std::vector<std::string> effect::get_outputs()
+{
+    auto lock = get_lock();
+    return handle_get_outputs__l();
 }
 
 }

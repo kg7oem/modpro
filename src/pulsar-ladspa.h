@@ -55,9 +55,12 @@ namespace ladspa {
         std::vector<ladspa::data_type> control_buffers;
         const ladspa::id_type get_port_num(const std::string &name_in);
         virtual void handle_run__l(const pulsar::size_type &num_samples_in) override;
+        virtual void handle_activate__l() override;
         virtual const pulsar::data_type handle_peek__l(const std::string &name_in) override;
         virtual void handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in) override;
         virtual const pulsar::data_type handle_get_default__l(const std::string &name_in) override;
+        virtual const std::vector<std::string> handle_get_inputs__l() override;
+        virtual const std::vector<std::string> handle_get_outputs__l() override;
 
         public:
         const ladspa::size_type &sample_rate;

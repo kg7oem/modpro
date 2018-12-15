@@ -109,6 +109,8 @@ instance::instance(std::shared_ptr<ladspa::file> file_in, const std::string &lab
         if (LADSPA_IS_PORT_CONTROL(port_descriptor)) {
             control_buffers[i] = get_default(descriptor->PortNames[i]);
             descriptor->connect_port(handle, i, &control_buffers[i]);
+        } else if (LADSPA_IS_PORT_AUDIO(port_descriptor)) {
+            descriptor->connect_port(handle, i, nullptr);
         }
     }
 }
@@ -121,6 +123,13 @@ instance::~instance()
         }
 
         descriptor->cleanup(handle);
+    }
+}
+
+void instance::handle_activate__l()
+{
+    if (descriptor->activate != nullptr) {
+        descriptor->activate(handle);
     }
 }
 
@@ -225,6 +234,34 @@ const pulsar::data_type instance::handle_get_default__l(const std::string &name_
     }
 
     throw std::logic_error("could not find hint for ladspa plugin " + file->path + " " + label);
+}
+
+const std::vector<std::string> instance::handle_get_inputs__l()
+{
+    std::vector<std::string> names;
+
+    for(id_type i = 0; i < descriptor->PortCount; i++) {
+        auto port_descriptor = descriptor->PortDescriptors[i];
+        if (LADSPA_IS_PORT_AUDIO(port_descriptor) && LADSPA_IS_PORT_INPUT(port_descriptor)) {
+            names.push_back(descriptor->PortNames[i]);
+        }
+    }
+
+    return names;
+}
+
+const std::vector<std::string> instance::handle_get_outputs__l()
+{
+    std::vector<std::string> names;
+
+    for(id_type i = 0; i < descriptor->PortCount; i++) {
+        auto port_descriptor = descriptor->PortDescriptors[i];
+        if (LADSPA_IS_PORT_AUDIO(port_descriptor) && LADSPA_IS_PORT_OUTPUT(port_descriptor)) {
+            names.push_back(descriptor->PortNames[i]);
+        }
+    }
+
+    return names;
 }
 
 } // namespace ladspa
