@@ -14,65 +14,71 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <iostream>
+#include <list>
 
-#include "audio.h"
-#include "dbus.h"
-#include "event.h"
+#include "pulsar.h"
+#include "pulsar-ladspa.h"
+// #include "audio.h"
+// #include "event.h"
 
 using namespace std;
-using namespace modpro;
+// using namespace modpro;
 
-void handle_audio_started()
-{
-    cout << "Audio system has started" << endl;
-}
+// void handle_audio_started()
+// {
+//     cout << "Audio system has started" << endl;
+// }
 
-void handle_audio_stopped(bool * should_run_p_in)
-{
-    *should_run_p_in = false;
-    cout << "Audio system has stopped" << endl;
-}
+// void handle_audio_stopped(bool * should_run_p_in)
+// {
+//     *should_run_p_in = false;
+//     cout << "Audio system has stopped" << endl;
+// }
 
-void handle_audio_client_changed(shared_ptr<audio::processor> processor_in)
-{
-    processor_in->check_auto_connect();
-}
+// void handle_audio_client_changed(shared_ptr<audio::processor> processor_in)
+// {
+//     processor_in->check_auto_connect();
+// }
 
-void process_audio(const char * conf_path)
-{
-    bool should_run = true;
+// void process_audio(const char * conf_path)
+// {
+//     bool should_run = true;
 
-    auto dbus_broker = dbus::make();
-    dbus_broker->start();
+//     auto dbus_broker = dbus::make();
+//     dbus_broker->start();
 
-    auto event_broker = make_shared<event::broker>();
-    auto processor = audio::processor::make(conf_path, event_broker, dbus_broker);
+//     auto event_broker = make_shared<event::broker>();
+//     auto processor = audio::processor::make(conf_path, event_broker, dbus_broker);
 
-    processor->start();
+//     processor->start();
 
-    while(should_run) {
-        auto event = event_broker->get_event();
+//     while(should_run) {
+//         auto event = event_broker->get_event();
 
-        switch (event) {
-            case event::name::audio_started: handle_audio_started(); break;
-            case event::name::audio_stopped: handle_audio_stopped(&should_run); break;
-            case event::name::audio_processed: break;
-            case event::name::audio_client_change: handle_audio_client_changed(processor); break;
-        }
-    }
-}
+//         switch (event) {
+//             case event::name::audio_started: handle_audio_started(); break;
+//             case event::name::audio_stopped: handle_audio_stopped(&should_run); break;
+//             case event::name::audio_processed: break;
+//             case event::name::audio_client_change: handle_audio_client_changed(processor); break;
+//         }
+//     }
+// }
+
+#define SAMPLE_RATE 48000
+#define BUFFER_SIZE 512
 
 int main(int argc, const char *argv[])
 {
-    if (argc != 2) {
-        throw std::runtime_error("specify a configuration file");
+    auto plugin = make_shared<pulsar::ladspa::file>("/usr/lib/ladspa/delay_1898.so");
+
+    for(auto i : plugin->get_descriptors()) {
+        cout << "label: " << i->Label;
+        cout << "; name: " << i->Name;
+        cout << endl;
     }
 
-    cout << "Starting" << endl;
-    cout << endl;
+    auto instance = plugin->make_instance("delay_n", SAMPLE_RATE);
+    auto edge = make_shared<pulsar::edge>(BUFFER_SIZE);
 
-    process_audio(argv[1]);
-
-    cout << "Done" << endl;
-    return 0;
+    instance->connect("Input", edge);
 }
