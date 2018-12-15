@@ -1,0 +1,164 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use v5.10;
+
+use Data::Dumper;
+use Hamlib;
+# use POSIX;
+use POSIX::1003::Termios qw(:functions :actions :flags);
+use Time::HiRes qw(sleep gettimeofday);
+use X11::Xlib;
+
+use constant KEYPAD_ENTER_KEY_CODE => 104;
+use constant HAMLIB_NETWORK_RIG_ID => 2;
+use constant KEY_POLL_HZ => 20;
+use constant KEY_POLL_DELAY => 1 / KEY_POLL_HZ;
+
+my $display = X11::Xlib->new();
+Hamlib::rig_set_debug($Hamlib::RIG_DEBUG_ERR);
+my $rig = new Hamlib::Rig(HAMLIB_NETWORK_RIG_ID);
+say "Opening up rig with hamlib";
+$rig->set_conf("rig_pathname","192.168.100.100:4532");
+$rig->open;
+
+$SIG{__DIE__} = sub { say STDERR "Caught die()" };
+$SIG{INT} = sub { die "caught INT" };
+$SIG{ALRM} = sub { die "caught ALRM" };
+
+END {
+    turn_echo_on();
+    # unconditionally turn off PTT when exiting
+    say STDERR "Forcing PTT off at END";
+    $rig->set_ptt($Hamlib::RIG_VFO_CURR, 0);
+}
+
+configure_terminal();
+
+say "Looking for key events";
+while(1) {
+    alarm(1);
+
+    my $start_at = gettimeofday();
+    my $should_transmit = 0;
+
+    foreach my $key_code ($display->XQueryKeymap) {
+        if ($key_code == KEYPAD_ENTER_KEY_CODE) {
+            $should_transmit = 1;
+            last;
+        }
+    }
+
+    if ($should_transmit) {
+        ptt_on();
+    } else {
+        ptt_off();
+    }
+
+    my $freq = get_freq();
+    my $mode = get_mode_name();
+    my $buf = "$freq $mode ";
+
+    if (get_ptt()) {
+        $buf .= "*TRANSMIT*";
+    } else {
+        $buf .= "receive";
+    }
+
+    $buf .= ' ' x 20 . "\r";
+    # do a single write to the terminal to draw nicely
+    print $buf;
+
+    my $delay = $start_at + KEY_POLL_DELAY - gettimeofday();
+    if ($delay < 0) {
+        # say STDERR "could not meet soft realtime deadline: $delay";
+        $delay = 0;
+    }
+    # don't mix sleep() and alarm()
+    select(undef, undef, undef, $delay);
+}
+
+sub get_ptt {
+    my $ptt_state = $rig->get_ptt();
+    if ($ptt_state < 0) {
+        die "hamlib error: " . Hamlib::rigerror($ptt_state);
+    }
+    return $ptt_state;
+}
+
+sub get_freq {
+    my $freq = $rig->get_freq($Hamlib::RIG_VFO_CURR);
+    if ($freq < 0) {
+        die "hamlib error: " . Hamlib::rigerror($freq);
+    }
+
+    $freq = reverse($freq);
+    $freq =~ s/(.{3})/$1./g;
+    $freq = reverse($freq);
+    $freq =~ s/^\.//;
+
+    return $freq;
+}
+
+sub get_mode_name {
+    my ($mode_num, $filter_width) = $rig->get_mode();
+    if ($mode_num < 0) {
+        die "hamlib error: " . Hamlib::rigerror($mode_num);
+    }
+    return Hamlib::rig_strrmode($mode_num);
+}
+
+sub set_ptt {
+    my ($value) = @_;
+    my $result = $rig->set_ptt($Hamlib::RIG_VFO_CURR, $value);
+    if ($result < 0) {
+        die "hamlib error: " . Hamlib::rigerror($result);
+    }
+    return $result;
+}
+
+sub ptt_on {
+    return unless should_send(1);
+    $rig->set_ptt($Hamlib::RIG_VFO_CURR, 1);
+}
+
+sub ptt_off {
+    return unless should_send(0);
+    $rig->set_ptt($Hamlib::RIG_VFO_CURR, 0);
+}
+
+sub should_send {
+    my ($value) = @_;
+    state $last_sent_value;
+
+    if (! defined $last_sent_value || $last_sent_value != $value) {
+        $last_sent_value = $value;
+        return 1;
+    }
+
+    return 0;
+}
+
+sub configure_terminal {
+	close(STDIN);
+    # turn off output buffering
+    $| = 1;
+
+    # disable local echo
+    my $termios = POSIX::1003::Termios->new;
+    $termios->getattr(1);
+    my $lflag = $termios->getlflag();
+    $lflag &= ~(POSIX::ECHO | POSIX::ECHOE | POSIX::ECHOK | POSIX::ECHONL);
+    $termios->setlflag($lflag);
+    $termios->setattr(1, POSIX::TCSANOW);
+}
+
+sub turn_echo_on {
+    my $termios = POSIX::1003::Termios->new;
+    $termios->getattr(1);
+    my $lflag = $termios->getlflag();
+    $lflag |= (POSIX::ECHO | POSIX::ECHOE | POSIX::ECHOK | POSIX::ECHONL);
+    $termios->setlflag($lflag);
+    $termios->setattr(1, POSIX::TCSANOW);
+}
