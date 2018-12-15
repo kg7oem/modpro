@@ -69,20 +69,20 @@ using namespace std;
 
 int main(int argc, const char *argv[])
 {
+    cout << "main(): starting" << endl;
+
+    auto domain = make_shared<pulsar::domain>(SAMPLE_RATE, BUFFER_SIZE);
     auto plugin = make_shared<pulsar::ladspa::file>("/usr/lib/ladspa/delay_1898.so");
+    auto instance = plugin->make_instance(domain, "delay_n");
 
-    for(auto i : plugin->get_descriptors()) {
-        cout << "label: " << i->Label;
-        cout << "; name: " << i->Name;
-        cout << endl;
-    }
-
-    auto input_edge = make_shared<pulsar::edge>(BUFFER_SIZE);
-    auto output_edge = make_shared<pulsar::edge>(BUFFER_SIZE);
-    auto instance = plugin->make_instance("delay_n", SAMPLE_RATE);
-    instance->connect("Input", input_edge);
-    instance->connect("Output", output_edge);
+    cout << "main(): done with variables" << endl;
 
     instance->activate();
+    std::cout << "main(): done with activate()" << endl;
+
     instance->run(BUFFER_SIZE);
+    cout << "main(): done with run()" << endl;
+
+    cout << "main(): returning" << endl;
+    return 0;
 }

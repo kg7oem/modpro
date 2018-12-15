@@ -21,61 +21,37 @@
 
 namespace pulsar {
 
-edge::edge(const size_type &buffer_size_in)
-: buffer_size(buffer_size_in)
+edge::edge(pulsar::node * output_node_in, const std::string &output_name_in)
+: output_node(output_node_in), output_name(output_name_in)
 {
-    buffer = static_cast<data_type *>(std::calloc(buffer_size_in, sizeof(data_type)));
 
-    if (buffer == nullptr) {
-        throw std::runtime_error("could not allocate buffer for edge");
-    }
 }
 
 edge::~edge()
 {
-    if (buffer != nullptr) {
-        free(buffer);
-        buffer = nullptr;
-    }
+
 }
 
-void edge::set_ready__l()
+node::node(std::shared_ptr<pulsar::domain> domain_in)
+: domain(domain_in)
 {
-    ready = true;
-}
 
-void edge::clear_ready__l()
-{
-    ready = false;
-}
-
-const bool edge::is_ready__l()
-{
-    if (input == nullptr) {
-        return true;
-    }
-
-    return ready;
-}
-
-void edge::set_input__l(pulsar::node * input_in)
-{
-    input = input_in;
-}
-
-void edge::set_output__l(pulsar::node * output_in)
-{
-    output = output_in;
-}
-
-data_type * edge::get_pointer__l()
-{
-    return buffer;
 }
 
 node::~node()
 {
 
+}
+
+bool node::is_ready__l()
+{
+    return ready;
+}
+
+bool node::is_ready()
+{
+    auto lock = get_lock();
+    return is_ready__l();
 }
 
 void node::set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
@@ -84,9 +60,9 @@ void node::set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar:
         throw std::runtime_error("attempt to double connect to input " + name_in);
     }
 
-    auto edge_lock = edge_in->get_lock();
     input_edges[name_in] = edge_in;
-    edge_in->set_output__l(this);
+    edge_in->input_node = this;
+    edge_in->input_name = name_in;
 }
 
 void node::set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
@@ -95,9 +71,32 @@ void node::set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar
         throw std::runtime_error("attempt to double connect to output " + name_in);
     }
 
-    auto edge_lock = edge_in->get_lock();
     output_edges[name_in] = edge_in;
-    edge_in->set_input__l(this);
+    edge_in->output_node = this;
+    edge_in->output_name = name_in;
+}
+
+data_type * node::get_output_buffer(const std::string &name_in)
+{
+    auto lock = get_lock();
+    return get_output_buffer__l(name_in);
+}
+
+std::shared_ptr<edge> node::make_output_edge(const std::string &name_in)
+{
+    return std::make_shared<edge>(this, name_in);
+}
+
+domain::domain(const size_type &sample_rate_in, const size_type &buffer_size_in)
+: sample_rate(sample_rate_in), buffer_size(buffer_size_in)
+{
+
+}
+
+effect::effect(std::shared_ptr<pulsar::domain> domain_in)
+: node(domain_in)
+{
+
 }
 
 effect::~effect()
@@ -115,31 +114,26 @@ void effect::run(const size_type &num_samples_in)
 {
     auto lock = get_lock();
 
-    for(auto input_name : get_inputs()) {
+    for(auto input_name : get_inputs__l()) {
         if (input_edges.count(input_name) == 0) {
             throw std::runtime_error("attempt to run node with an unconnected input");
         }
     }
 
-    for(auto output_name : get_outputs()) {
+    for(auto output_name : get_outputs__l()) {
         if (output_edges.count(output_name) == 0) {
             throw std::runtime_error("attempt to run node with an unconnected output");
         }
     }
 
     for(auto edge : input_edges) {
-        auto edge_lock = edge.second->get_lock();
-        if (! edge.second->is_ready__l()) {
-            throw std::runtime_error("attempt to run node with an edge that was not ready");
+        if (! edge.second->output_node->is_ready()) {
+            throw std::runtime_error("attempt to run node with a parent that was not ready");
         }
     }
 
     handle_run__l(num_samples_in);
-
-    for(auto edge : output_edges) {
-        auto edge_lock = edge.second->get_lock();
-        edge.second->set_ready__l();
-    }
+    ready = true;
 }
 
 const pulsar::data_type effect::peek(const std::string &name_in)
@@ -174,13 +168,13 @@ const pulsar::data_type effect::get_default(const std::string &name_in)
 const std::vector<std::string> effect::get_inputs()
 {
     auto lock = get_lock();
-    return handle_get_inputs__l();
+    return get_inputs__l();
 }
 
 const std::vector<std::string> effect::get_outputs()
 {
     auto lock = get_lock();
-    return handle_get_outputs__l();
+    return get_outputs__l();
 }
 
 }

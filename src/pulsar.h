@@ -27,44 +27,51 @@ namespace pulsar {
 using data_type = float;
 using size_type = unsigned long;
 
+class domain;
 class effect;
 class node;
 
-class edge : public modpro::util::lockable, public std::enable_shared_from_this<edge> {
-    const size_type buffer_size;
-    pulsar::node * input;
-    pulsar::node * output;
-    bool ready = false;
-    data_type * buffer = nullptr;
-
-    public:
-    edge(const size_type &buffer_size_in);
+struct edge : public std::enable_shared_from_this<edge> {
+    pulsar::node * input_node;
+    std::string input_name;
+    pulsar::node * output_node;
+    std::string output_name;
+    edge(pulsar::node * output_node_in, const std::string &input_name_in);
     ~edge();
-    void set_input__l(pulsar::node * input_in);
-    pulsar::node * get_input__l();
-    void set_output__l(pulsar::node * output_in);
-    pulsar::node * get_output__l();
-    const bool is_ready__l();
-    void set_ready__l();
-    void clear_ready__l();
-    data_type * get_pointer__l();
 };
 
 class node : protected modpro::util::lockable {
     friend pulsar::effect;
 
+    bool ready = false;
     std::map<std::string, std::shared_ptr<pulsar::edge>> input_edges;
     std::map<std::string, std::shared_ptr<pulsar::edge>> output_edges;
 
     protected:
+    std::shared_ptr<pulsar::domain> domain;
     void set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in);
     void set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in);
+    virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     bool is_ready__l();
 
     public:
+    node(std::shared_ptr<pulsar::domain> domain_in);
     virtual ~node();
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) = 0;
     // virtual void disconnect(const std::string &name_in) = 0;
+    bool is_ready();
+    std::shared_ptr<edge> make_output_edge(const std::string &name_in);
+    data_type * get_output_buffer(const std::string &name_in);
+};
+
+class domain : public std::enable_shared_from_this<domain> {
+    private:
+    std::vector<edge> edges;
+
+    public:
+    const size_type sample_rate;
+    const size_type buffer_size;
+    domain(const size_type &sample_rate_in, const size_type &buffer_size_in);
 };
 
 class effect : public node {
@@ -73,11 +80,13 @@ class effect : public node {
     virtual const pulsar::data_type handle_peek__l(const std::string &name_in) = 0;
     virtual void handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in) = 0;
     virtual const pulsar::data_type handle_get_default__l(const std::string &name_in) = 0;
-    virtual const std::vector<std::string> handle_get_inputs__l() = 0;
-    virtual const std::vector<std::string> handle_get_outputs__l() = 0;
+    virtual const std::vector<std::string> get_inputs__l() = 0;
+    virtual const std::vector<std::string> get_outputs__l() = 0;
+    virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     virtual void handle_activate__l() = 0;
 
     public:
+    effect(std::shared_ptr<pulsar::domain> domain_in);
     virtual ~effect();
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) = 0;
     void activate();

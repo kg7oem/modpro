@@ -46,27 +46,29 @@ namespace ladspa {
         const std::vector<std::string> get_labels();
         file(const std::string &path_in);
         virtual ~file();
-        std::shared_ptr<instance> make_instance(const std::string &label_in, const ladspa::size_type &sample_rate_in);
+        std::shared_ptr<instance> make_instance(std::shared_ptr<domain> domain_in, const std::string &label_in);
     };
 
     class instance : public pulsar::effect, public std::enable_shared_from_this<instance> {
         handle_type handle = nullptr;
         const descriptor_type * descriptor = nullptr;
         std::vector<ladspa::data_type> control_buffers;
+        std::vector<data_type *> output_buffers;
         const ladspa::id_type get_port_num(const std::string &name_in);
         virtual void handle_run__l(const pulsar::size_type &num_samples_in) override;
         virtual void handle_activate__l() override;
         virtual const pulsar::data_type handle_peek__l(const std::string &name_in) override;
         virtual void handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in) override;
         virtual const pulsar::data_type handle_get_default__l(const std::string &name_in) override;
-        virtual const std::vector<std::string> handle_get_inputs__l() override;
-        virtual const std::vector<std::string> handle_get_outputs__l() override;
+        virtual const std::vector<std::string> get_inputs__l() override;
+        virtual const std::vector<std::string> get_outputs__l() override;
+        virtual data_type * get_output_buffer__l(const std::string &name_in) override;
 
         public:
         const ladspa::size_type &sample_rate;
         const std::shared_ptr<ladspa::file> file;
         const std::string label;
-        instance(std::shared_ptr<ladspa::file> file_in, const std::string &label_in, const ladspa::size_type &sample_rate_in);
+        instance(std::shared_ptr<pulsar::domain> domain_in, std::shared_ptr<ladspa::file> file_in, const std::string &label_in);
         virtual ~instance();
         virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) override;
     };

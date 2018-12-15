@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <dlfcn.h>
+#include <iostream>
 
 #include "pulsar-ladspa.h"
 
@@ -87,22 +89,23 @@ const std::vector<std::string> file::get_labels()
     return labels;
 }
 
-std::shared_ptr<instance> file::make_instance(const std::string &label_in, const ladspa::size_type &sample_rate_in)
+std::shared_ptr<instance> file::make_instance(std::shared_ptr<domain> domain_in, const std::string &label_in)
 {
-    return std::make_shared<instance>(this->shared_from_this(), label_in, sample_rate_in);
+    return std::make_shared<instance>(domain_in, this->shared_from_this(), label_in);
 }
 
-instance::instance(std::shared_ptr<ladspa::file> file_in, const std::string &label_in, const ladspa::size_type &sample_rate_in)
-: sample_rate(sample_rate_in), file(file_in), label(label_in)
+instance::instance(std::shared_ptr<pulsar::domain> domain_in, std::shared_ptr<ladspa::file> file_in, const std::string &label_in)
+: pulsar::effect(domain_in), sample_rate(domain->sample_rate), file(file_in), label(label_in)
 {
     descriptor = file->get_descriptor(label_in);
-    handle = descriptor->instantiate(descriptor, sample_rate_in);
+    handle = descriptor->instantiate(descriptor, sample_rate);
 
     if (handle == nullptr) {
         throw std::runtime_error("could not instantiate ladspa " + file->path + ": " + label);
     }
 
     control_buffers.reserve(descriptor->PortCount);
+    output_buffers.assign(descriptor->PortCount, nullptr);
 
     for(id_type i = 0; i < descriptor->PortCount; i++) {
         auto port_descriptor = descriptor->PortDescriptors[i];
@@ -110,7 +113,18 @@ instance::instance(std::shared_ptr<ladspa::file> file_in, const std::string &lab
             control_buffers[i] = get_default(descriptor->PortNames[i]);
             descriptor->connect_port(handle, i, &control_buffers[i]);
         } else if (LADSPA_IS_PORT_AUDIO(port_descriptor)) {
-            descriptor->connect_port(handle, i, nullptr);
+            data_type * p;
+
+            if (LADSPA_IS_PORT_INPUT(port_descriptor)) {
+                p = nullptr;
+            } else {
+                p = output_buffers[i] = static_cast<data_type *>(std::calloc(domain->buffer_size, sizeof(data_type)));
+                if (p == nullptr) {
+                    throw std::runtime_error("could not calloc()");
+                }
+            }
+
+            descriptor->connect_port(handle, i, p);
         }
     }
 }
@@ -123,6 +137,12 @@ instance::~instance()
         }
 
         descriptor->cleanup(handle);
+    }
+
+    for (auto p : output_buffers) {
+        if (p != nullptr) {
+            free(p);
+        }
     }
 }
 
@@ -147,25 +167,35 @@ const id_type instance::get_port_num(const std::string &name_in)
 
 void instance::connect(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
 {
+    std::cout << "in connect()" << std::endl;
+
     auto our_lock = get_lock();
-    auto edge_lock = edge_in->get_lock();
+    std::cout << "got our_lock" << std::endl;
+
+    // auto edge_lock = edge_in->get_lock();
+    // std::cout << "got edge_lock" << std::endl;
 
     auto port_num = get_port_num(name_in);
     auto port_descriptor = descriptor->PortDescriptors[port_num];
+    std::cout << "past auto port_descriptor" << std::endl;
 
     if (! LADSPA_IS_PORT_AUDIO(port_descriptor)) {
         throw std::runtime_error("attempt to connect to a non-audio ladspa port");
     }
 
-    descriptor->connect_port(handle, port_num, edge_in->get_pointer__l());
-
     if (LADSPA_IS_PORT_INPUT(port_descriptor)) {
+        assert(edge_in->output_node != nullptr);
+
+        auto output_buffer = edge_in->output_node->get_output_buffer(name_in);
+        descriptor->connect_port(handle, port_num, output_buffer);
         set_input_edge__l(name_in, edge_in);
     } else if (LADSPA_IS_PORT_OUTPUT(port_descriptor)) {
-        set_output_edge__l(name_in, edge_in);
+        throw std::runtime_error("use make_output_edge() instead of connect() with an audio output");
     } else {
         throw std::runtime_error("ladspa port was not INPUT or OUTPUT");
     }
+
+    std::cout << "done with instance::connect()" << std::endl;
 }
 
 void instance::handle_run__l(const pulsar::size_type &num_samples_in)
@@ -236,7 +266,7 @@ const pulsar::data_type instance::handle_get_default__l(const std::string &name_
     throw std::logic_error("could not find hint for ladspa plugin " + file->path + " " + label);
 }
 
-const std::vector<std::string> instance::handle_get_inputs__l()
+const std::vector<std::string> instance::get_inputs__l()
 {
     std::vector<std::string> names;
 
@@ -250,7 +280,7 @@ const std::vector<std::string> instance::handle_get_inputs__l()
     return names;
 }
 
-const std::vector<std::string> instance::handle_get_outputs__l()
+const std::vector<std::string> instance::get_outputs__l()
 {
     std::vector<std::string> names;
 
@@ -262,6 +292,18 @@ const std::vector<std::string> instance::handle_get_outputs__l()
     }
 
     return names;
+}
+
+data_type * instance::get_output_buffer__l(const std::string &name_in)
+{
+    auto port_num = get_port_num(name_in);
+    auto buffer = output_buffers[port_num];
+
+    if (buffer == nullptr) {
+        throw std::runtime_error("no buffer was available for port name " + name_in);
+    }
+
+    return buffer;
 }
 
 } // namespace ladspa
