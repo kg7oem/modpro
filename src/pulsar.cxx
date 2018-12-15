@@ -86,6 +86,29 @@ effect::~effect()
 
 }
 
+const pulsar::data_type effect::peek(const std::string &name_in)
+{
+    auto lock = get_lock();
+    return handle_peek__l(name_in);
+}
+
+void effect::poke(const std::string &name_in, const pulsar::data_type &value_in)
+{
+    auto lock = get_lock();
+    handle_poke__l(name_in, value_in);
+}
+
+const pulsar::data_type effect::knudge(const std::string &name_in, const pulsar::data_type &value_in)
+{
+    auto lock = get_lock();
+    auto value = handle_peek__l(name_in);
+
+    value += value_in;
+    handle_poke__l(name_in, value);
+
+    return value;
+}
+
 const pulsar::data_type effect::get_default(const std::string &name_in)
 {
     auto lock = get_lock();

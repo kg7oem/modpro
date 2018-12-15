@@ -81,4 +81,10 @@ int main(int argc, const char *argv[])
     auto edge = make_shared<pulsar::edge>(BUFFER_SIZE);
 
     instance->connect("Input", edge);
+
+    cout << "Peek: " << instance->peek("Delay Time (s)") << endl;
+    instance->poke("Delay Time (s)", 1);
+    cout << "After poke: " << instance->peek("Delay Time (s)") << endl;
+    instance->knudge("Delay Time (s)", 2);
+    cout << "After knudge: " << instance->peek("Delay Time (s)") << endl;
 }
