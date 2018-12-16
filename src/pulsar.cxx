@@ -71,6 +71,12 @@ void node::set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar
     edge_in->output_name = name_in;
 }
 
+data_type * node::get_input_buffer(const std::string &name_in)
+{
+    auto lock = get_lock();
+    return get_input_buffer(name_in);
+}
+
 void node::set_input_buffer(const std::string &name_in, data_type * buffer_in)
 {
     auto lock = get_lock();
@@ -81,6 +87,12 @@ data_type * node::get_output_buffer(const std::string &name_in)
 {
     auto lock = get_lock();
     return get_output_buffer__l(name_in);
+}
+
+void node::set_output_buffer(const std::string &name_in, data_type * buffer_in)
+{
+    auto lock = get_lock();
+    return set_output_buffer__l(name_in, buffer_in);
 }
 
 std::shared_ptr<edge> node::make_output_edge(const std::string &name_in)
@@ -106,24 +118,23 @@ bool root::is_ready__l()
     return buffer != nullptr;
 }
 
+data_type * root::get_input_buffer__l(const std::string &name_in)
+{
+    throw std::runtime_error("root nodes do not have input buffers");
+}
+
 void root::set_input_buffer__l(const std::string &name_in, data_type * buffer_in)
 {
     throw std::runtime_error("can not set input buffer for a root node");
 }
 
-void root::set_output_buffer__l(data_type * buffer_in)
+void root::set_output_buffer__l(const std::string &name_in, data_type * buffer_in)
 {
     buffer = buffer_in;
 
     for (auto i : created_output_edges) {
         i->input_node->set_input_buffer(i->input_name, buffer);
     }
-}
-
-void root::set_output_buffer(data_type * buffer_in)
-{
-    auto lock = get_lock();
-    set_output_buffer__l(buffer_in);
 }
 
 data_type * root::get_output_buffer__l(const std::string &name_in)

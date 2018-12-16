@@ -62,7 +62,9 @@ namespace ladspa {
         virtual const pulsar::data_type handle_get_default__l(const std::string &name_in) override;
         virtual const std::vector<std::string> get_inputs__l() override;
         virtual const std::vector<std::string> get_outputs__l() override;
+        virtual data_type * get_input_buffer__l(const std::string &name_in) override;
         virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) override;
+        virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) override;
         virtual data_type * get_output_buffer__l(const std::string &name_in) override;
 
         public:

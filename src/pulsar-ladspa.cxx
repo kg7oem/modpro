@@ -294,6 +294,11 @@ const std::vector<std::string> instance::get_outputs__l()
     return names;
 }
 
+data_type * instance::get_input_buffer__l(const std::string &name_in)
+{
+    throw std::runtime_error("ladspa can't get_input_buffer() - yet?");
+}
+
 void instance::set_input_buffer__l(const std::string &name_in, data_type * buffer_in)
 {
     auto port_num = get_port_num(name_in);
@@ -304,12 +309,13 @@ data_type * instance::get_output_buffer__l(const std::string &name_in)
 {
     auto port_num = get_port_num(name_in);
     auto buffer = output_buffers[port_num];
-
-    if (buffer == nullptr) {
-        throw std::runtime_error("no buffer was available for port name " + name_in);
-    }
-
     return buffer;
+}
+
+void instance::set_output_buffer__l(const std::string &name_in, data_type * buffer_in)
+{
+    auto port_num = get_port_num(name_in);
+    descriptor->connect_port(handle, port_num, buffer_in);
 }
 
 } // namespace ladspa

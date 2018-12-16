@@ -51,8 +51,10 @@ class node : protected modpro::util::lockable {
     std::shared_ptr<pulsar::domain> domain;
     void set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in);
     void set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in);
+    virtual data_type * get_input_buffer__l(const std::string &name_in) = 0;
     virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
+    virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual bool is_ready__l() = 0;
 
     public:
@@ -63,6 +65,8 @@ class node : protected modpro::util::lockable {
     bool is_ready();
     std::shared_ptr<edge> make_output_edge(const std::string &name_in);
     void set_input_buffer(const std::string &name_in, data_type * buffer_in);
+    data_type * get_input_buffer(const std::string &name_in);
+    void set_output_buffer(const std::string &name_in, data_type * buffer_in);
     data_type * get_output_buffer(const std::string &name_in);
 };
 
@@ -71,15 +75,15 @@ class root : public pulsar::node, public std::enable_shared_from_this<root> {
 
     protected:
     virtual bool is_ready__l() override;
-    virtual data_type * get_output_buffer__l(const std::string &name_in) override;
+    virtual data_type * get_input_buffer__l(const std::string &name_in) override;
     virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) override;
-    void set_output_buffer__l(data_type * buffer_in);
+    virtual data_type * get_output_buffer__l(const std::string &name_in) override;
+    void set_output_buffer__l(const std::string &name_in, data_type * buffer_in);
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) override;
 
     public:
     root(std::shared_ptr<pulsar::domain> domain_in);
     virtual ~root();
-    void set_output_buffer(data_type * buffer_in);
 };
 
 class domain : public std::enable_shared_from_this<domain> {
@@ -103,6 +107,8 @@ class effect : public node {
     virtual const std::vector<std::string> get_inputs__l() = 0;
     virtual const std::vector<std::string> get_outputs__l() = 0;
     virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
+    virtual data_type * get_input_buffer__l(const std::string &name_in) = 0;
+    virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     virtual void handle_activate__l() = 0;
     virtual bool is_ready__l() override;
