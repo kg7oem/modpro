@@ -13,6 +13,18 @@ zam-plugins
 Using zam-plugins 3.9 is recommend but Stretch only has 3.7 in backports.
 Try downloading the binary package from https://packages.debian.org/sid/zam-plugins
 
+
+Perl modules that are needed for keyboard-ptt
+
+POSIX::1003::Termios
+X11::Xlib
+
+Debian / Ubuntu packages needed for keyboard-ptt
+
+libhamlib2-perl # provides Hamlib perl module
+libx11-dev
+libxslt1-dev
+
 Copyright (C) 2018  Tyler Riddle <cardboardaardvark@gmail.com>
 
 This program is free software: you can redistribute it and/or modify

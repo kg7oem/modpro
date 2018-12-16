@@ -5,8 +5,9 @@ use warnings;
 use v5.10;
 
 use Data::Dumper;
-use Hamlib;
+# use Hamlib;
 # use POSIX;
+use IO::Socket::INET6;
 use POSIX::1003::Termios qw(:functions :actions :flags);
 use Time::HiRes qw(sleep gettimeofday);
 use X11::Xlib;
@@ -17,11 +18,18 @@ use constant KEY_POLL_HZ => 20;
 use constant KEY_POLL_DELAY => 1 / KEY_POLL_HZ;
 
 my $display = X11::Xlib->new();
-Hamlib::rig_set_debug($Hamlib::RIG_DEBUG_ERR);
-my $rig = new Hamlib::Rig(HAMLIB_NETWORK_RIG_ID);
-say "Opening up rig with hamlib";
-$rig->set_conf("rig_pathname","192.168.100.100:4532");
-$rig->open;
+# Hamlib::rig_set_debug($Hamlib::RIG_DEBUG_ERR);
+# my $rig = new Hamlib::Rig(HAMLIB_NETWORK_RIG_ID);
+# say "Opening up rig with hamlib";
+# $rig->set_conf("rig_pathname","192.168.100.100:4532");
+# $rig->open;
+
+my $remote_host = $ARGV[0] or die "must specify a host to connect to";
+
+my $net = IO::Socket::INET6->new(
+    PeerAddr => "$remote_host:8888",
+    Proto => 'tcp',
+) or die "could not make socket";
 
 $SIG{__DIE__} = sub { say STDERR "Caught die()" };
 $SIG{INT} = sub { die "caught INT" };
@@ -31,7 +39,7 @@ END {
     turn_echo_on();
     # unconditionally turn off PTT when exiting
     say STDERR "Forcing PTT off at END";
-    $rig->set_ptt($Hamlib::RIG_VFO_CURR, 0);
+    # $rig->set_ptt($Hamlib::RIG_VFO_CURR, 0);
 }
 
 configure_terminal();
@@ -79,8 +87,29 @@ while(1) {
     select(undef, undef, undef, $delay);
 }
 
+sub network_read {
+    my ($text) = @_;
+    say $net $text or die "could not write";
+
+    my $resp = $net->getline;
+    chomp($resp);
+    return $resp;
+}
+
+sub network_write {
+    my ($text) = @_;
+    say $net $text or die "could not write";
+
+    my $resp = $net->getline;
+    chomp($resp);
+
+    die "invalid response: $resp" unless $resp =~ /^RPRT (\d+)$/;
+    return $1;
+}
+
 sub get_ptt {
-    my $ptt_state = $rig->get_ptt();
+    # my $ptt_state = $rig->get_ptt();
+    my $ptt_state = network_read("t");
     if ($ptt_state < 0) {
         die "hamlib error: " . Hamlib::rigerror($ptt_state);
     }
@@ -88,7 +117,8 @@ sub get_ptt {
 }
 
 sub get_freq {
-    my $freq = $rig->get_freq($Hamlib::RIG_VFO_CURR);
+    # my $freq = $rig->get_freq($Hamlib::RIG_VFO_CURR);
+    my $freq = network_read("f");
     if ($freq < 0) {
         die "hamlib error: " . Hamlib::rigerror($freq);
     }
@@ -102,16 +132,19 @@ sub get_freq {
 }
 
 sub get_mode_name {
-    my ($mode_num, $filter_width) = $rig->get_mode();
+    # my ($mode_num, $filter_width) = $rig->get_mode();
+    my $mode_num = 0;
     if ($mode_num < 0) {
         die "hamlib error: " . Hamlib::rigerror($mode_num);
     }
-    return Hamlib::rig_strrmode($mode_num);
+    return "nopemode";
+    # return Hamlib::rig_strrmode($mode_num);
 }
 
 sub set_ptt {
     my ($value) = @_;
-    my $result = $rig->set_ptt($Hamlib::RIG_VFO_CURR, $value);
+    # my $result = $rig->set_ptt($Hamlib::RIG_VFO_CURR, $value);
+    my $result = network_write("T $value");
     if ($result < 0) {
         die "hamlib error: " . Hamlib::rigerror($result);
     }
@@ -120,12 +153,14 @@ sub set_ptt {
 
 sub ptt_on {
     return unless should_send(1);
-    $rig->set_ptt($Hamlib::RIG_VFO_CURR, 1);
+    set_ptt(1);
+    #$rig->set_ptt($Hamlib::RIG_VFO_CURR, 1);
 }
 
 sub ptt_off {
     return unless should_send(0);
-    $rig->set_ptt($Hamlib::RIG_VFO_CURR, 0);
+    set_ptt(0);
+    #$rig->set_ptt($Hamlib::RIG_VFO_CURR, 0);
 }
 
 sub should_send {
@@ -141,7 +176,7 @@ sub should_send {
 }
 
 sub configure_terminal {
-	close(STDIN);
+    close(STDIN);
     # turn off output buffering
     $| = 1;
 
