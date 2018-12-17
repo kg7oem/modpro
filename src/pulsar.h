@@ -56,6 +56,7 @@ class node : protected modpro::util::lockable {
     virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual bool is_ready__l() = 0;
+    virtual void reset__l() = 0;
 
     public:
     node(std::shared_ptr<pulsar::domain> domain_in);
@@ -63,6 +64,7 @@ class node : protected modpro::util::lockable {
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) = 0;
     // virtual void disconnect(const std::string &name_in) = 0;
     bool is_ready();
+    void reset();
     std::shared_ptr<edge> make_output_edge(const std::string &name_in);
     void set_input_buffer(const std::string &name_in, data_type * buffer_in);
     data_type * get_input_buffer(const std::string &name_in);
@@ -75,6 +77,7 @@ class root : public pulsar::node, public std::enable_shared_from_this<root> {
 
     protected:
     virtual bool is_ready__l() override;
+    virtual void reset__l() override;
     virtual data_type * get_input_buffer__l(const std::string &name_in) override;
     virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) override;
     virtual data_type * get_output_buffer__l(const std::string &name_in) override;
@@ -99,7 +102,6 @@ class domain : public std::enable_shared_from_this<domain> {
 
 class effect : public node {
     protected:
-    bool ready = false;
     virtual void handle_run__l(const pulsar::size_type &num_samples_in) = 0;
     virtual const pulsar::data_type handle_peek__l(const std::string &name_in) = 0;
     virtual void handle_poke__l(const std::string &name_in, const pulsar::data_type &value_in) = 0;
@@ -111,7 +113,8 @@ class effect : public node {
     virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     virtual void handle_activate__l() = 0;
-    virtual bool is_ready__l() override;
+    virtual bool is_ready__l() = 0;
+    virtual void reset__l() = 0;
 
     public:
     effect(std::shared_ptr<pulsar::domain> domain_in);

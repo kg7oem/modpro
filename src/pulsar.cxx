@@ -118,6 +118,11 @@ bool root::is_ready__l()
     return buffer != nullptr;
 }
 
+void root::reset__l()
+{
+    // does not need to do anything
+}
+
 data_type * root::get_input_buffer__l(const std::string &name_in)
 {
     throw std::runtime_error("root nodes do not have input buffers");
@@ -183,11 +188,6 @@ void effect::activate()
     return handle_activate__l();
 }
 
-bool effect::is_ready__l()
-{
-    return ready;
-}
-
 void effect::run(const size_type &num_samples_in)
 {
     auto lock = get_lock();
@@ -211,7 +211,6 @@ void effect::run(const size_type &num_samples_in)
     }
 
     handle_run__l(num_samples_in);
-    ready = true;
 }
 
 const pulsar::data_type effect::peek(const std::string &name_in)

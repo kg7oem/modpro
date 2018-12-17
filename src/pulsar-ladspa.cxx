@@ -153,6 +153,16 @@ void instance::handle_activate__l()
     }
 }
 
+void instance::reset__l()
+{
+    ready = false;
+}
+
+bool instance::is_ready__l()
+{
+    return ready;
+}
+
 // this method does not require locking
 const id_type instance::get_port_num(const std::string &name_in)
 {
@@ -201,6 +211,7 @@ void instance::connect(const std::string &name_in, std::shared_ptr<pulsar::edge>
 void instance::handle_run__l(const pulsar::size_type &num_samples_in)
 {
     descriptor->run(handle, num_samples_in);
+    ready = true;
 }
 
 const pulsar::data_type instance::handle_peek__l(const std::string &name_in)
