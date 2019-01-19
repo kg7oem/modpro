@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -43,46 +44,49 @@ struct edge : public std::enable_shared_from_this<edge> {
 class node : protected modpro::util::lockable {
     friend pulsar::effect;
 
-    std::map<std::string, std::shared_ptr<pulsar::edge>> input_edges;
-    std::map<std::string, std::shared_ptr<pulsar::edge>> output_edges;
-
     protected:
-    std::vector<std::shared_ptr<edge>> created_output_edges;
     std::shared_ptr<pulsar::domain> domain;
+    std::vector<std::shared_ptr<pulsar::edge>> input_edges;
+    std::vector<std::shared_ptr<pulsar::edge>> output_edges;
+    std::atomic<bool> ready_flag = ATOMIC_VAR_INIT(false);
     void set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in);
     void set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in);
     virtual data_type * get_input_buffer__l(const std::string &name_in) = 0;
     virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
-    virtual bool is_ready__l() = 0;
-    virtual void reset__l() = 0;
+    // virtual bool is_ready__l() = 0;
+    // virtual void reset__l() = 0;
+    virtual void handle_run__l(const pulsar::size_type &num_samples_in) = 0;
 
     public:
     node(std::shared_ptr<pulsar::domain> domain_in);
     virtual ~node();
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) = 0;
     // virtual void disconnect(const std::string &name_in) = 0;
+    void run(const pulsar::size_type &num_samples_in);
     bool is_ready();
-    void reset();
+    void clear_ready();
     std::shared_ptr<edge> make_output_edge(const std::string &name_in);
     void set_input_buffer(const std::string &name_in, data_type * buffer_in);
     data_type * get_input_buffer(const std::string &name_in);
     void set_output_buffer(const std::string &name_in, data_type * buffer_in);
     data_type * get_output_buffer(const std::string &name_in);
+    const std::vector<node *> get_ready_children();
 };
 
 class root : public pulsar::node, public std::enable_shared_from_this<root> {
     data_type * buffer;
 
     protected:
-    virtual bool is_ready__l() override;
-    virtual void reset__l() override;
+    // virtual bool is_ready__l() override;
+    // virtual void reset__l() override;
     virtual data_type * get_input_buffer__l(const std::string &name_in) override;
     virtual void set_input_buffer__l(const std::string &name_in, data_type * buffer_in) override;
     virtual data_type * get_output_buffer__l(const std::string &name_in) override;
     void set_output_buffer__l(const std::string &name_in, data_type * buffer_in);
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) override;
+    virtual void handle_run__l(const pulsar::size_type &num_samples_in) override;
 
     public:
     root(std::shared_ptr<pulsar::domain> domain_in);
@@ -113,15 +117,14 @@ class effect : public node {
     virtual void set_output_buffer__l(const std::string &name_in, data_type * buffer_in) = 0;
     virtual data_type * get_output_buffer__l(const std::string &name_in) = 0;
     virtual void handle_activate__l() = 0;
-    virtual bool is_ready__l() = 0;
-    virtual void reset__l() = 0;
+    // virtual bool is_ready__l() override;
+    // virtual void reset__l() override;
 
     public:
     effect(std::shared_ptr<pulsar::domain> domain_in);
     virtual ~effect();
     virtual void connect(const std::string &name_in, std::shared_ptr<pulsar::edge>) = 0;
     void activate();
-    void run(const pulsar::size_type &num_samples_in);
     const pulsar::data_type peek(const std::string &name_in);
     void poke(const std::string &name_in, const pulsar::data_type &value_in);
     const pulsar::data_type knudge(const std::string &name_in, const pulsar::data_type &value_in);

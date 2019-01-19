@@ -55,8 +55,8 @@ namespace ladspa {
         std::vector<ladspa::data_type> control_buffers;
         std::vector<data_type *> output_buffers;
         bool ready = false;
-        virtual bool is_ready__l() override;
-        virtual void reset__l() override;
+        // virtual bool is_ready__l() override;
+        // virtual void reset__l() override;
         const ladspa::id_type get_port_num(const std::string &name_in);
         virtual void handle_run__l(const pulsar::size_type &num_samples_in) override;
         virtual void handle_activate__l() override;

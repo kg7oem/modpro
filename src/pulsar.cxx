@@ -45,31 +45,35 @@ node::~node()
 
 bool node::is_ready()
 {
-    auto lock = get_lock();
-    return is_ready__l();
+    return ready_flag.load();
 }
 
-void node::set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
+void node::clear_ready()
 {
-    if (input_edges.count(name_in) != 0) {
-        throw std::runtime_error("attempt to double connect to input " + name_in);
-    }
-
-    input_edges[name_in] = edge_in;
-    edge_in->input_node = this;
-    edge_in->input_name = name_in;
+    ready_flag.store(false);
 }
 
-void node::set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
-{
-    if (output_edges.count(name_in) != 0) {
-        throw std::runtime_error("attempt to double connect to output " + name_in);
-    }
+// void node::set_input_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
+// {
+//     if (input_edges.count(name_in) != 0) {
+//         throw std::runtime_error("attempt to double connect to input " + name_in);
+//     }
 
-    output_edges[name_in] = edge_in;
-    edge_in->output_node = this;
-    edge_in->output_name = name_in;
-}
+//     input_edges[name_in] = edge_in;
+//     edge_in->input_node = this;
+//     edge_in->input_name = name_in;
+// }
+
+// void node::set_output_edge__l(const std::string &name_in, std::shared_ptr<pulsar::edge> edge_in)
+// {
+//     if (output_edges.count(name_in) != 0) {
+//         throw std::runtime_error("attempt to double connect to output " + name_in);
+//     }
+
+//     output_edges[name_in] = edge_in;
+//     edge_in->output_node = this;
+//     edge_in->output_name = name_in;
+// }
 
 data_type * node::get_input_buffer(const std::string &name_in)
 {
@@ -98,8 +102,50 @@ void node::set_output_buffer(const std::string &name_in, data_type * buffer_in)
 std::shared_ptr<edge> node::make_output_edge(const std::string &name_in)
 {
     auto new_edge = std::make_shared<edge>(this, name_in);
-    created_output_edges.push_back(new_edge);
+    output_edges.push_back(new_edge);
     return new_edge;
+}
+
+void node::run(const size_type &num_samples_in)
+{
+    auto lock = get_lock();
+
+    // for(auto input_name : get_inputs__l()) {
+    //     if (input_edges.count(input_name) == 0) {
+    //         throw std::runtime_error("attempt to run node with an unconnected input");
+    //     }
+    // }
+
+    // for(auto output_name : get_outputs__l()) {
+    //     if (output_edges.count(output_name) == 0) {
+    //         throw std::runtime_error("attempt to run node with an unconnected output");
+    //     }
+    // }
+
+    for(auto edge : input_edges) {
+        if (! edge->output_node->is_ready()) {
+            throw std::runtime_error("attempt to run node with a parent that was not ready");
+        }
+    }
+
+    handle_run__l(num_samples_in);
+    ready_flag.store(true);
+}
+
+const std::vector<node *> node::get_ready_children()
+{
+    std::vector<node *> ready;
+
+    for(auto edge : output_edges) {
+        auto node = edge->input_node;
+        std::cout << "checking for readiness" << std::endl;
+        if (node->can_run()) {
+            std::cout << "  this one is ready " << std::endl;
+            ready.push_back(node);
+        }
+    }
+
+    return ready;
 }
 
 root::root(std::shared_ptr<pulsar::domain> domain_in)
@@ -113,15 +159,15 @@ root::~root()
 
 }
 
-bool root::is_ready__l()
-{
-    return buffer != nullptr;
-}
+// bool root::is_ready__l()
+// {
+//     return buffer != nullptr;
+// }
 
-void root::reset__l()
-{
-    // does not need to do anything
-}
+// void root::reset__l()
+// {
+//     // does not need to do anything
+// }
 
 data_type * root::get_input_buffer__l(const std::string &name_in)
 {
@@ -137,8 +183,8 @@ void root::set_output_buffer__l(const std::string &name_in, data_type * buffer_i
 {
     buffer = buffer_in;
 
-    for (auto i : created_output_edges) {
-        i->input_node->set_input_buffer(i->input_name, buffer);
+    for (auto edge : output_edges) {
+        edge->input_node->set_input_buffer(edge->input_name, buffer);
     }
 }
 
@@ -149,6 +195,12 @@ data_type * root::get_output_buffer__l(const std::string &name_in)
     // }
 
     return buffer;
+}
+
+void root::handle_run__l(const pulsar::size_type &num_samples_in)
+{
+    // nothing to do
+    return;
 }
 
 void root::connect(const std::string &name_in, std::shared_ptr<pulsar::edge>)
@@ -186,31 +238,6 @@ void effect::activate()
 {
     auto lock = get_lock();
     return handle_activate__l();
-}
-
-void effect::run(const size_type &num_samples_in)
-{
-    auto lock = get_lock();
-
-    for(auto input_name : get_inputs__l()) {
-        if (input_edges.count(input_name) == 0) {
-            throw std::runtime_error("attempt to run node with an unconnected input");
-        }
-    }
-
-    // for(auto output_name : get_outputs__l()) {
-    //     if (output_edges.count(output_name) == 0) {
-    //         throw std::runtime_error("attempt to run node with an unconnected output");
-    //     }
-    // }
-
-    for(auto edge : input_edges) {
-        if (! edge.second->output_node->is_ready()) {
-            throw std::runtime_error("attempt to run node with a parent that was not ready");
-        }
-    }
-
-    handle_run__l(num_samples_in);
 }
 
 const pulsar::data_type effect::peek(const std::string &name_in)

@@ -153,15 +153,15 @@ void instance::handle_activate__l()
     }
 }
 
-void instance::reset__l()
-{
-    ready = false;
-}
+// void instance::reset__l()
+// {
+//     ready = false;
+// }
 
-bool instance::is_ready__l()
-{
-    return ready;
-}
+// bool instance::is_ready__l()
+// {
+//     return ready;
+// }
 
 // this method does not require locking
 const id_type instance::get_port_num(const std::string &name_in)
@@ -196,9 +196,11 @@ void instance::connect(const std::string &name_in, std::shared_ptr<pulsar::edge>
     if (LADSPA_IS_PORT_INPUT(port_descriptor)) {
         assert(edge_in->output_node != nullptr);
 
+        edge_in->input_node = this;
+        edge_in->input_name = name_in;
         auto output_buffer = edge_in->output_node->get_output_buffer(name_in);
         set_input_buffer__l(name_in, output_buffer);
-        set_input_edge__l(name_in, edge_in);
+        input_edges.push_back(edge_in);
     } else if (LADSPA_IS_PORT_OUTPUT(port_descriptor)) {
         throw std::runtime_error("use make_output_edge() instead of connect() with an audio output");
     } else {

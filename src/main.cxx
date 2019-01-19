@@ -69,6 +69,8 @@ using namespace std;
 
 int main(int argc, const char *argv[])
 {
+    vector<pulsar::node *> ready_nodes;
+
     cout << "main(): starting" << endl;
 
     auto domain = make_shared<pulsar::domain>(SAMPLE_RATE, BUFFER_SIZE);
@@ -87,13 +89,19 @@ int main(int argc, const char *argv[])
     instance->connect("Input", root->make_output_edge("output"));
     cout << "main(): done connecting" << endl;
 
-    instance->run(BUFFER_SIZE);
-    cout << "main(): done with first run()" << endl;
+    ready_nodes.push_back(root.get());
 
-    root->set_output_buffer("output", nullptr);
-    instance->run(BUFFER_SIZE);
-    cout << "main(): done with second run()" << endl;
+    while(ready_nodes.size() > 0) {
+        auto ready = ready_nodes.back();
+        ready_nodes.pop_back();
+        cout << "running node from ready list" << endl;
+        ready->run(BUFFER_SIZE);
 
-    cout << "main(): returning" << endl;
-    return 0;
+        for (auto now_ready : ready->get_ready_children()) {
+            cout << "something was ready" << endl;
+            ready_nodes.push_back(now_ready);
+        }
+    }
+
+    cout << "done" << endl;
 }
